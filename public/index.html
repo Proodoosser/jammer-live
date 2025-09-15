@@ -6,8 +6,6 @@
     <title>Live Lessons Pro | Виртуальный класс</title>
     <!-- Подключаем Socket.IO -->
     <script src="/socket.io/socket.io.js"></script>
-    <!-- Подключаем Janus.js -->
-    <script src="https://janus.conf.meetecho.com/janus.js"></script>
     <!-- Подключаем иконки -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -328,6 +326,21 @@
                 flex-direction: column;
             }
         }
+
+        /* Loader */
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -341,7 +354,7 @@
                 </div>
                 <div class="status" id="janusStatus">
                     <span class="status-dot status-disconnected"></span>
-                    <span>Media: Отключен</span>
+                    <span>Media: Загрузка...</span>
                 </div>
             </div>
         </header>
@@ -418,6 +431,114 @@
 
     <div id="notificationArea"></div>
 
-    <script src="app.js"></script>
+    <!-- Загрузка Janus с резервным источником -->
+    <script>
+        function loadJanus() {
+            console.log('Загрузка библиотеки Janus...');
+            
+            // Пробуем загрузить с основного CDN
+            var script = document.createElement('script');
+            script.src = 'https://janus.conf.meetecho.com/janus.js';
+            script.onload = function() {
+                console.log('Janus успешно загружен с основного CDN');
+                window.janusLoaded = true;
+                updateJanusStatus('loaded');
+            };
+            script.onerror = function() {
+                console.log('Основной CDN недоступен, пробуем альтернативный...');
+                // Если основной CDN не работает, пробуем альтернативный
+                var backupScript = document.createElement('script');
+                backupScript.src = 'https://cdn.jsdelivr.net/npm/janus-gateway@1.0.0/janus.js';
+                backupScript.onload = function() {
+                    console.log('Janus успешно загружен с альтернативного CDN');
+                    window.janusLoaded = true;
+                    updateJanusStatus('loaded');
+                };
+                backupScript.onerror = function() {
+                    console.error('Все CDN недоступны');
+                    window.janusLoaded = false;
+                    updateJanusStatus('error');
+                    showNotification('Не удалось загрузить медиа-библиотеку. Проверьте подключение к интернету.', 'error', 0);
+                };
+                document.head.appendChild(backupScript);
+            };
+            document.head.appendChild(script);
+        }
+        
+        function updateJanusStatus(status) {
+            const janusStatusElement = document.getElementById('janusStatus');
+            const dot = janusStatusElement.querySelector('.status-dot');
+            const text = janusStatusElement.querySelector('span:last-child');
+            
+            if (status === 'loaded') {
+                dot.className = 'status-dot status-connected';
+                text.textContent = 'Media: Готов';
+                showNotification('Медиа-библиотека загружена', 'success');
+            } else if (status === 'error') {
+                dot.className = 'status-dot status-disconnected';
+                text.textContent = 'Media: Ошибка';
+            } else {
+                dot.className = 'status-dot status-connecting';
+                text.textContent = 'Media: Загрузка...';
+            }
+        }
+        
+        function showNotification(message, type = 'info', duration = 5000) {
+            const notificationArea = document.getElementById('notificationArea');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            
+            let icon = 'info-circle';
+            if (type === 'success') icon = 'check-circle';
+            if (type === 'error') icon = 'exclamation-circle';
+
+            notification.innerHTML = `<i class="fas fa-${icon}"></i> ${message}`;
+            notificationArea.appendChild(notification);
+
+            // Анимация появления
+            setTimeout(() => notification.classList.add('show'), 10);
+
+            // Автоматическое скрытие
+            if (duration > 0) {
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => notification.remove(), 300);
+                }, duration);
+            }
+
+            return notification;
+        }
+
+        // Загружаем Janus при загрузке страницы
+        window.addEventListener('load', function() {
+            loadJanus();
+            // Запускаем проверку готовности Janus
+            checkJanusReady();
+        });
+
+        function checkJanusReady() {
+            const checkInterval = setInterval(function() {
+                if (window.janusLoaded && typeof Janus !== 'undefined') {
+                    clearInterval(checkInterval);
+                    // Загружаем основной скрипт приложения
+                    loadAppScript();
+                }
+            }, 100);
+        }
+
+        function loadAppScript() {
+            // Создаем и загружаем app.js
+            var script = document.createElement('script');
+            script.src = 'app.js';
+            script.onload = function() {
+                console.log('App.js успешно загружен');
+            };
+            script.onerror = function() {
+                console.error('Ошибка загрузки app.js');
+                showNotification('Ошибка загрузки приложения', 'error');
+            };
+            document.body.appendChild(script);
+        }
+    </script>
 </body>
 </html>
