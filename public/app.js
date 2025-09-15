@@ -4,7 +4,7 @@ const SIGNALING_SERVER =
     ? "http://localhost:3000"
     : window.location.origin;
 
-// Xirsys TURN/STUN
+// Xirsys ICE (лучше обновлять динамически, пока — статический)
 const ICE_CONFIG = {
   iceServers: [
     {
@@ -42,7 +42,6 @@ const sendChatBtn = document.getElementById("sendChatBtn");
 let socket = null;
 let pc = null;
 let localStream = null;
-let remoteStream = null;
 let roomId = null;
 let role = null;
 let peerSocketId = null;
@@ -78,15 +77,16 @@ async function startLocalMedia() {
 
 function createPeerConnection() {
   pc = new RTCPeerConnection(ICE_CONFIG);
-  remoteStream = new MediaStream();
-  remoteVideo.srcObject = remoteStream;
 
   if (localStream) {
-    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+    localStream.getTracks().forEach((track) =>
+      pc.addTrack(track, localStream)
+    );
   }
 
   pc.ontrack = (evt) => {
-    evt.streams[0].getTracks().forEach((t) => remoteStream.addTrack(t));
+    log("Got remote stream");
+    remoteVideo.srcObject = evt.streams[0];
   };
 
   pc.onicecandidate = (evt) => {
@@ -97,63 +97,76 @@ function createPeerConnection() {
   };
 
   pc.onconnectionstatechange = () => {
-    log("PC state: " + pc.connectionState);
     statusSpan.textContent = pc.connectionState;
+    log("PC state: " + pc.connectionState);
   };
 }
 
-/* ====== События Socket.IO ====== */
+async function makeOffer() {
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  socket.emit("offer", { to: peerSocketId, sdp: pc.localDescription });
+  log("Sent offer to " + peerSocketId);
+}
+
+/* ======= Socket ======= */
 function setupSocket() {
   socket = io(SIGNALING_SERVER);
 
   socket.on("connect", () => {
     socketIdSpan.textContent = socket.id;
     log("Connected to signaling server: " + socket.id);
+    socket.emit("join-room", roomId, role);
   });
 
-  socket.on("peer-joined", (data) => {
-    log("Peer joined: " + JSON.stringify(data));
-    peerSocketId = data.id;
+  socket.on("peer-joined", ({ id, role: r }) => {
+    log("Peer joined: " + JSON.stringify({ id, role: r }));
+    // Только teacher ↔ student
+    if (role !== r) {
+      peerSocketId = id;
+      if (role === "teacher") {
+        makeOffer();
+      }
+    }
   });
 
   socket.on("offer", async ({ from, sdp }) => {
-    log("Received offer from " + from);
-    peerSocketId = from;
-    if (!pc) createPeerConnection();
-    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    socket.emit("answer", { room: roomId, sdp: pc.localDescription });
-    log("Sent answer to " + from);
+    if (role === "student") {
+      log("Received offer from " + from);
+      peerSocketId = from;
+      if (!pc) createPeerConnection();
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit("answer", { to: from, sdp: pc.localDescription });
+      log("Sent answer to " + from);
+    }
   });
 
   socket.on("answer", async ({ from, sdp }) => {
     log("Received answer from " + from);
-    peerSocketId = from;
     await pc.setRemoteDescription(new RTCSessionDescription(sdp));
   });
 
   socket.on("ice-candidate", async ({ from, candidate }) => {
-    log("Received ICE from " + from);
-    try {
-      await pc.addIceCandidate(candidate);
-    } catch (e) {
-      console.warn(e);
+    if (pc) {
+      try {
+        await pc.addIceCandidate(candidate);
+        log("Added ICE candidate from " + from);
+      } catch (e) {
+        console.warn("Error adding candidate", e);
+      }
     }
   });
 
   socket.on("peer-left", ({ id }) => {
     log("Peer left: " + id);
     addChat("system", "Партнёр отключился");
-    if (remoteStream) {
-      remoteStream.getTracks().forEach((t) => t.stop());
-      remoteStream = null;
-      remoteVideo.srcObject = null;
-    }
     if (pc) {
       pc.close();
       pc = null;
     }
+    remoteVideo.srcObject = null;
   });
 
   socket.on("message", ({ user, text }) => {
@@ -161,7 +174,7 @@ function setupSocket() {
   });
 }
 
-/* ======= Join / Start logic ======= */
+/* ======= Join / Leave ======= */
 joinBtn.onclick = async () => {
   roomId = roomIdInput.value.trim();
   role = roleSelect.value;
@@ -172,24 +185,11 @@ joinBtn.onclick = async () => {
   joinBtn.disabled = true;
   leaveBtn.disabled = false;
 
-  setupSocket();
   await startLocalMedia();
   createPeerConnection();
-
-  socket.emit("join-room", roomId, role);
-  log("Joined room " + roomId + " as " + role);
-
-  if (role === "teacher") {
-    setTimeout(async () => {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      socket.emit("offer", { room: roomId, sdp: pc.localDescription });
-      log("Teacher: created offer and emitted");
-    }, 500);
-  }
+  setupSocket();
 };
 
-/* ====== Leave ====== */
 leaveBtn.onclick = () => {
   if (socket) socket.disconnect();
   if (pc) {
@@ -208,11 +208,10 @@ leaveBtn.onclick = () => {
   log("Left room");
 };
 
-/* ===== Chat ====== */
+/* ===== Chat ===== */
 sendChatBtn.onclick = () => {
   const text = chatInput.value.trim();
   if (!text) return;
-  addChat(role, text); // только локальное имя
   if (socket) socket.emit("message", { room: roomId, user: role, text });
   chatInput.value = "";
 };
