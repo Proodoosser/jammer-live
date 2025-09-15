@@ -14,13 +14,12 @@ const ICE_CONFIG = {
         "turn:fr-turn3.xirsys.com:80?transport=tcp",
         "turn:fr-turn3.xirsys.com:3478?transport=tcp",
         "turns:fr-turn3.xirsys.com:443?transport=tcp",
-        "turns:fr-turn3.xirsys.com:5349?transport=tcp",
+        "turns:fr-turn3.xirsys.com:5349?transport=tcp"
       ],
-      username:
-        "B0UKGM_7iTKBEwxa1dB6bNj18YKk4Vm-Fo7a3ddF4G8gshE2GgC_0tLJnF8DGtPnAAAAAGjHzn1Qcm9kb29zc2Vy",
-      credential: "24cbbacc-920e-11f0-82f1-e25abca605ee",
-    },
-  ],
+      username: "B0UKGM_7iTKBEwxa1dB6bNj18YKk4Vm-Fo7a3ddF4G8gshE2GgC_0tLJnF8DGtPnAAAAAGjHzn1Qcm9kb29zc2Vy",
+      credential: "24cbbacc-920e-11f0-82f1-e25abca605ee"
+    }
+  ]
 };
 
 /* ======= Элементы ======= */
