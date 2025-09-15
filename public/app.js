@@ -22,6 +22,7 @@ const ICE_CONFIG = {
       credential: "24cbbacc-920e-11f0-82f1-e25abca605ee",
     },
   ],
+  iceTransportPolicy: "relay"
 };
 
 /* ======= Элементы ======= */
@@ -66,7 +67,11 @@ async function startLocalMedia() {
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
       video: true,
-      audio: true,
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        sampleRate: 48000,
+      },
     });
     localVideo.srcObject = localStream;
   } catch (e) {
@@ -104,9 +109,15 @@ function createPeerConnection() {
 
 async function makeOffer() {
   const offer = await pc.createOffer();
+  offer.sdp = preferOpus(offer.sdp);
   await pc.setLocalDescription(offer);
   socket.emit("offer", { to: peerSocketId, sdp: pc.localDescription });
   log("Sent offer to " + peerSocketId);
+}
+
+function preferOpus(sdp) {
+  if (!sdp) return sdp;
+  return sdp.replace(/(m=audio.*?)( 9)/, "$1 111 9");
 }
 
 /* ======= Socket ======= */
@@ -137,6 +148,7 @@ function setupSocket() {
       if (!pc) createPeerConnection();
       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
       const answer = await pc.createAnswer();
+      answer.sdp = preferOpus(answer.sdp);
       await pc.setLocalDescription(answer);
       socket.emit("answer", { to: from, sdp: pc.localDescription });
       log("Sent answer to " + from);
