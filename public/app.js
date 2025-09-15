@@ -1,101 +1,217 @@
-const socket = io();
+/* ======= Конфигурация ======= */
+const SIGNALING_SERVER =
+  location.hostname === "localhost" || location.hostname === "127.0.0.1"
+    ? "http://localhost:3000"
+    : window.location.origin;
 
-let pc;
-let localStream;
-let role = null;
-let roomId = null;
-
-const config = {
+// Xirsys ICE (лучше обновлять динамически, пока — статический)
+const ICE_CONFIG = {
   iceServers: [
     {
-      urls: "turns:global.xirsys.net:5349",
-      username: "Prodoosser",
-      credential: "c673ce8e-920c-11f0-8f21-4662eff0c0a9"
-    }
+      urls: [
+        "stun:fr-turn3.xirsys.com",
+        "turn:fr-turn3.xirsys.com:80?transport=udp",
+        "turn:fr-turn3.xirsys.com:3478?transport=udp",
+        "turn:fr-turn3.xirsys.com:80?transport=tcp",
+        "turn:fr-turn3.xirsys.com:3478?transport=tcp",
+        "turns:fr-turn3.xirsys.com:443?transport=tcp",
+        "turns:fr-turn3.xirsys.com:5349?transport=tcp"
+      ],
+      username:
+        "B0UKGM_7iTKBEwxa1dB6bNj18YKk4Vm-Fo7a3ddF4G8gshE2GgC_0tLJnF8DGtPnAAAAAGjHzn1Qcm9kb29zc2Vy",
+      credential: "24cbbacc-920e-11f0-82f1-e25abca605ee",
+    },
   ],
-  iceTransportPolicy: "relay"
 };
 
-async function initMedia() {
+/* ======= Элементы ======= */
+const localVideo = document.getElementById("localVideo");
+const remoteVideo = document.getElementById("remoteVideo");
+const joinBtn = document.getElementById("joinBtn");
+const leaveBtn = document.getElementById("leaveBtn");
+const roomIdInput = document.getElementById("roomId");
+const roleSelect = document.getElementById("roleSelect");
+const statusSpan = document.getElementById("status");
+const showRoom = document.getElementById("showRoom");
+const socketIdSpan = document.getElementById("socketId");
+const logEl = document.getElementById("log");
+const chatEl = document.getElementById("chat");
+const chatInput = document.getElementById("chatInput");
+const sendChatBtn = document.getElementById("sendChatBtn");
+
+let socket = null;
+let pc = null;
+let localStream = null;
+let roomId = null;
+let role = null;
+let peerSocketId = null;
+
+/* ======= Утилиты ======= */
+function log(msg) {
+  const d = document.createElement("div");
+  d.textContent = msg;
+  logEl.appendChild(d);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function addChat(user, text) {
+  const d = document.createElement("div");
+  d.className = "msg";
+  d.innerHTML = `<b>${user}:</b> ${text}`;
+  chatEl.appendChild(d);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+/* ======= WebRTC ======= */
+async function startLocalMedia() {
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-    document.getElementById("localVideo").srcObject = localStream;
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true,
+    });
+    localVideo.srcObject = localStream;
   } catch (e) {
-    console.error("getUserMedia error", e);
+    alert("Ошибка доступа к камере/микрофону: " + e.message);
+    throw e;
   }
 }
 
 function createPeerConnection() {
-  pc = new RTCPeerConnection(config);
+  pc = new RTCPeerConnection(ICE_CONFIG);
 
-  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
-  pc.ontrack = (event) => {
-    console.log("ontrack", event.streams);
-    if (event.streams && event.streams[0]) {
-      document.getElementById("remoteVideo").srcObject = event.streams[0];
-    } else {
-      let inbound = new MediaStream();
-      inbound.addTrack(event.track);
-      document.getElementById("remoteVideo").srcObject = inbound;
-    }
-  };
-
-  pc.onicecandidate = (event) => {
-    if (event.candidate) {
-      socket.emit("ice-candidate", { roomId, candidate: event.candidate });
-    }
-  };
-}
-
-async function joinAs(r) {
-  role = r;
-  roomId = document.getElementById("roomId").value;
-  document.getElementById("status").textContent = "connecting...";
-
-  await initMedia();
-  createPeerConnection();
-
-  socket.emit("join", { roomId, role });
-}
-
-socket.on("offer", async ({ sdp }) => {
-  await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  socket.emit("answer", { roomId, sdp: pc.localDescription });
-});
-
-socket.on("answer", async ({ sdp }) => {
-  await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-});
-
-socket.on("ice-candidate", async ({ candidate }) => {
-  try {
-    await pc.addIceCandidate(new RTCIceCandidate(candidate));
-  } catch (e) {
-    console.error("Error adding candidate", e);
+  if (localStream) {
+    localStream.getTracks().forEach((track) =>
+      pc.addTrack(track, localStream)
+    );
   }
-});
 
-socket.on("chat", ({ user, text }) => {
-  addChat(user, text);
-});
+  pc.ontrack = (evt) => {
+    log("Got remote stream");
+    remoteVideo.srcObject = evt.streams[0];
+  };
 
-function addChat(user, text) {
-  const div = document.createElement("div");
-  div.className = "msg " + (user || "system");
-  div.textContent = `${user}: ${text}`;
-  document.getElementById("chatArea").appendChild(div);
-  document.getElementById("chatArea").scrollTop = 9999;
+  pc.onicecandidate = (evt) => {
+    if (evt.candidate && peerSocketId) {
+      socket.emit("ice-candidate", { to: peerSocketId, candidate: evt.candidate });
+      log("Sent ICE candidate to " + peerSocketId);
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    statusSpan.textContent = pc.connectionState;
+    log("PC state: " + pc.connectionState);
+  };
 }
 
-// UI
-document.getElementById("joinBtn").onclick = () => joinAs(document.getElementById("roleSelect").value);
-document.getElementById("leaveBtn").onclick = () => location.reload();
-document.getElementById("sendBtn").onclick = () => {
-  const val = document.getElementById("chatMsg").value.trim();
-  if (!val) return;
-  socket.emit("chat", { roomId, user: role, text: val });
-  document.getElementById("chatMsg").value = "";
+async function makeOffer() {
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  socket.emit("offer", { to: peerSocketId, sdp: pc.localDescription });
+  log("Sent offer to " + peerSocketId);
+}
+
+/* ======= Socket ======= */
+function setupSocket() {
+  socket = io(SIGNALING_SERVER);
+
+  socket.on("connect", () => {
+    socketIdSpan.textContent = socket.id;
+    log("Connected to signaling server: " + socket.id);
+    socket.emit("join-room", roomId, role);
+  });
+
+  socket.on("peer-joined", ({ id, role: r }) => {
+    log("Peer joined: " + JSON.stringify({ id, role: r }));
+    // Только teacher ↔ student
+    if (role !== r) {
+      peerSocketId = id;
+      if (role === "teacher") {
+        makeOffer();
+      }
+    }
+  });
+
+  socket.on("offer", async ({ from, sdp }) => {
+    if (role === "student") {
+      log("Received offer from " + from);
+      peerSocketId = from;
+      if (!pc) createPeerConnection();
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit("answer", { to: from, sdp: pc.localDescription });
+      log("Sent answer to " + from);
+    }
+  });
+
+  socket.on("answer", async ({ from, sdp }) => {
+    log("Received answer from " + from);
+    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+  });
+
+  socket.on("ice-candidate", async ({ from, candidate }) => {
+    if (pc) {
+      try {
+        await pc.addIceCandidate(candidate);
+        log("Added ICE candidate from " + from);
+      } catch (e) {
+        console.warn("Error adding candidate", e);
+      }
+    }
+  });
+
+  socket.on("peer-left", ({ id }) => {
+    log("Peer left: " + id);
+    addChat("system", "Партнёр отключился");
+    if (pc) {
+      pc.close();
+      pc = null;
+    }
+    remoteVideo.srcObject = null;
+  });
+
+  socket.on("message", ({ user, text }) => {
+    addChat(user, text);
+  });
+}
+
+/* ======= Join / Leave ======= */
+joinBtn.onclick = async () => {
+  roomId = roomIdInput.value.trim();
+  role = roleSelect.value;
+  if (!roomId) return alert("Укажи Room ID");
+
+  showRoom.textContent = roomId;
+  statusSpan.textContent = "connecting...";
+  joinBtn.disabled = true;
+  leaveBtn.disabled = false;
+
+  await startLocalMedia();
+  createPeerConnection();
+  setupSocket();
+};
+
+leaveBtn.onclick = () => {
+  if (socket) socket.disconnect();
+  if (pc) {
+    pc.close();
+    pc = null;
+  }
+  if (localStream) {
+    localStream.getTracks().forEach((t) => t.stop());
+    localStream = null;
+  }
+  remoteVideo.srcObject = null;
+  localVideo.srcObject = null;
+  joinBtn.disabled = false;
+  leaveBtn.disabled = true;
+  statusSpan.textContent = "not connected";
+  log("Left room");
+};
+
+/* ===== Chat ===== */
+sendChatBtn.onclick = () => {
+  const text = chatInput.value.trim();
+  if (!text) return;
+  if (socket) socket.emit("message", { room: roomId, user: role, text });
+  chatInput.value = "";
 };
