@@ -1,8 +1,7 @@
 {
   "name": "jammer-live",
   "version": "1.0.0",
-  "type": "module",
-  "description": "",
+   "description": "",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
