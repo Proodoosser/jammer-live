@@ -34,7 +34,7 @@ const roomIdInput = document.getElementById("roomId");
 const roleSelect = document.getElementById("roleSelect");
 const statusSpan = document.getElementById("status");
 const showRoom = document.getElementById("showRoom");
-const socketIdSpan = document.getElementById("socketId");
+const socketIdSpan = document.getElementById("socketId"); // может быть null
 const logEl = document.getElementById("log");
 const chatEl = document.getElementById("chat");
 const chatInput = document.getElementById("chatInput");
@@ -49,12 +49,14 @@ let peerSocketId = null;
 
 /* ======= Утилиты ======= */
 function log(msg) {
+  if (!logEl) return;
   const d = document.createElement("div");
   d.textContent = msg;
   logEl.appendChild(d);
   logEl.scrollTop = logEl.scrollHeight;
 }
 function addChat(user, text) {
+  if (!chatEl) return;
   const d = document.createElement("div");
   d.className = "msg";
   d.innerHTML = `<b>${user}:</b> ${text}`;
@@ -102,7 +104,7 @@ function createPeerConnection() {
   };
 
   pc.onconnectionstatechange = () => {
-    statusSpan.textContent = pc.connectionState;
+    if (statusSpan) statusSpan.textContent = pc.connectionState;
     log("PC state: " + pc.connectionState);
   };
 }
@@ -125,7 +127,7 @@ function setupSocket() {
   socket = io(SIGNALING_SERVER);
 
   socket.on("connect", () => {
-    socketIdSpan.textContent = socket.id;
+    if (socketIdSpan) socketIdSpan.textContent = socket.id;
     log("Connected to signaling server: " + socket.id);
     socket.emit("join-room", roomId, role);
   });
@@ -187,43 +189,49 @@ function setupSocket() {
 }
 
 /* ======= Join / Leave ======= */
-joinBtn.onclick = async () => {
-  roomId = roomIdInput.value.trim();
-  role = roleSelect.value;
-  if (!roomId) return alert("Укажи Room ID");
+if (joinBtn) {
+  joinBtn.onclick = async () => {
+    roomId = roomIdInput.value.trim();
+    role = roleSelect.value;
+    if (!roomId) return alert("Укажи Room ID");
 
-  showRoom.textContent = roomId;
-  statusSpan.textContent = "connecting...";
-  joinBtn.disabled = true;
-  leaveBtn.disabled = false;
+    if (showRoom) showRoom.textContent = roomId;
+    if (statusSpan) statusSpan.textContent = "connecting...";
+    joinBtn.disabled = true;
+    if (leaveBtn) leaveBtn.disabled = false;
 
-  await startLocalMedia();
-  createPeerConnection();
-  setupSocket();
-};
+    await startLocalMedia();
+    createPeerConnection();
+    setupSocket();
+  };
+}
 
-leaveBtn.onclick = () => {
-  if (socket) socket.disconnect();
-  if (pc) {
-    pc.close();
-    pc = null;
-  }
-  if (localStream) {
-    localStream.getTracks().forEach((t) => t.stop());
-    localStream = null;
-  }
-  remoteVideo.srcObject = null;
-  localVideo.srcObject = null;
-  joinBtn.disabled = false;
-  leaveBtn.disabled = true;
-  statusSpan.textContent = "not connected";
-  log("Left room");
-};
+if (leaveBtn) {
+  leaveBtn.onclick = () => {
+    if (socket) socket.disconnect();
+    if (pc) {
+      pc.close();
+      pc = null;
+    }
+    if (localStream) {
+      localStream.getTracks().forEach((t) => t.stop());
+      localStream = null;
+    }
+    remoteVideo.srcObject = null;
+    localVideo.srcObject = null;
+    if (joinBtn) joinBtn.disabled = false;
+    if (leaveBtn) leaveBtn.disabled = true;
+    if (statusSpan) statusSpan.textContent = "not connected";
+    log("Left room");
+  };
+}
 
 /* ===== Chat ===== */
-sendChatBtn.onclick = () => {
-  const text = chatInput.value.trim();
-  if (!text) return;
-  if (socket) socket.emit("message", { room: roomId, user: role, text });
-  chatInput.value = "";
-};
+if (sendChatBtn) {
+  sendChatBtn.onclick = () => {
+    const text = chatInput.value.trim();
+    if (!text) return;
+    if (socket) socket.emit("message", { room: roomId, user: role, text });
+    chatInput.value = "";
+  };
+}
