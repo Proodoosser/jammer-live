@@ -52,6 +52,7 @@ let mediaConstraints = {
     }
 };
 let currentSettings = { ...mediaConstraints };
+let janusLoaded = false;
 
 // ==================== УВЕДОМЛЕНИЯ ====================
 function showNotification(message, type = 'info', duration = 5000) {
@@ -114,8 +115,8 @@ async function populateDeviceSelectors() {
         const devices = await navigator.mediaDevices.enumerateDevices();
         
         // Очищаем селекты
-        videoSourceSelect.innerHTML = '';
-        audioSourceSelect.innerHTML = '';
+        videoSourceSelect.innerHTML = '<option value="">Выберите камеру</option>';
+        audioSourceSelect.innerHTML = '<option value="">Выберите микрофон</option>';
         
         // Добавляем устройства
         devices.forEach(device => {
@@ -137,6 +138,11 @@ async function populateDeviceSelectors() {
 
 // ==================== ПОДКЛЮЧЕНИЕ К СИГНАЛЬНОМУ СЕРВЕРУ ====================
 function connectToSignalingServer() {
+    if (!janusLoaded) {
+        showNotification('Библиотека Janus еще не загружена. Подождите...', 'error');
+        return;
+    }
+
     const username = usernameInput.value.trim();
     const roomId = roomIdInput.value.trim();
 
@@ -185,35 +191,45 @@ function connectToSignalingServer() {
 
 // ==================== ИНИЦИАЛИЗАЦИЯ JANUS ====================
 function initializeJanus() {
-    Janus.init({
-        debug: false,
-        dependencies: Janus.useDefaultDependencies(),
-        callback: function() {
-            showNotification('Janus API загружен', 'success');
-            
-            // Создаем сессию
-            janus = new Janus({
-                server: 'http://localhost:8088/janus',
-                success: function() {
-                    showNotification('Подключение к медиасерверу установлено', 'success');
-                    updateJanusStatus(true);
-                    session = janus;
-                    attachVideoRoomPlugin();
-                },
-                error: function(error) {
-                    console.error('Janus error:', error);
-                    showNotification('Ошибка подключения к медиасерверу', 'error');
-                    updateJanusStatus(false);
-                    connectButton.disabled = false;
-                    connectButton.innerHTML = '<i class="fas fa-plug"></i> Подключиться';
-                    connectButton.style.display = 'block';
-                },
-                destroyed: function() {
-                    updateJanusStatus(false);
-                }
-            });
-        }
-    });
+    if (typeof Janus === 'undefined') {
+        showNotification('Библиотека Janus не загружена', 'error');
+        return;
+    }
+
+    try {
+        Janus.init({
+            debug: true,
+            dependencies: Janus.useDefaultDependencies(),
+            callback: function() {
+                showNotification('Janus API загружен', 'success');
+                
+                // Создаем сессию
+                janus = new Janus({
+                    server: 'http://localhost:8088/janus',
+                    success: function() {
+                        showNotification('Подключение к медиасерверу установлено', 'success');
+                        updateJanusStatus(true);
+                        session = janus;
+                        attachVideoRoomPlugin();
+                    },
+                    error: function(error) {
+                        console.error('Janus error:', error);
+                        showNotification('Ошибка подключения к медиасерверу: ' + error, 'error');
+                        updateJanusStatus(false);
+                        connectButton.disabled = false;
+                        connectButton.innerHTML = '<i class="fas fa-plug"></i> Подключиться';
+                        connectButton.style.display = 'block';
+                    },
+                    destroyed: function() {
+                        updateJanusStatus(false);
+                    }
+                });
+            }
+        });
+    } catch (error) {
+        console.error('Janus init error:', error);
+        showNotification('Ошибка инициализации Janus: ' + error.message, 'error');
+    }
 }
 
 // ==================== ПОДКЛЮЧЕНИЕ К PLUGIN VIDEOROOM ====================
@@ -223,7 +239,7 @@ function attachVideoRoomPlugin() {
         return;
     }
 
-    // Генерируем opaqueId только когда Janus доступен
+    // Генерируем opaqueId
     opaqueId = "live-lessons-" + Math.random().toString(36).substring(2, 15);
 
     session.attach({
@@ -238,7 +254,7 @@ function attachVideoRoomPlugin() {
         },
         error: function(error) {
             console.error('Error attaching plugin:', error);
-            showNotification('Ошибка инициализации плагина', 'error');
+            showNotification('Ошибка инициализации плагина: ' + error, 'error');
         },
         onmessage: function(msg, jsep) {
             console.log('Plugin message:', msg);
@@ -333,7 +349,7 @@ async function startCall() {
         
     } catch (error) {
         console.error("Error starting call:", error);
-        showNotification('Ошибка доступа к медиаустройствам', 'error');
+        showNotification('Ошибка доступа к медиаустройствам: ' + error.message, 'error');
     }
 }
 
@@ -442,7 +458,7 @@ function updateVideoInfo(videoElement, infoElement, prefix) {
         if (videoElement.videoWidth && videoElement.videoHeight) {
             const fps = videoElement.getVideoPlaybackQuality?.()?.totalVideoFrames || 'N/A';
             infoElement.textContent = 
-                `${prefix}: ${videoElement.videoWidth}x${videoElement.videoHeight}, FPS: ${fps}`;
+                `${prefix}: ${videoElement.videoWidth}x${videoElement.videoHeight}`;
         }
     }
     
@@ -453,24 +469,28 @@ function updateVideoInfo(videoElement, infoElement, prefix) {
 
 // ==================== ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ ====================
 document.addEventListener('DOMContentLoaded', function() {
-    // Ждем загрузки Janus перед инициализацией
-    if (typeof Janus === 'undefined') {
-        // Если Janus еще не загружен, ждем события
-        window.addEventListener('load', initializeApp);
-    } else {
-        initializeApp();
-    }
+    initializeApp();
 });
 
 function initializeApp() {
-    // Проверяем, что Janus доступен
-    if (typeof Janus === 'undefined') {
-        showNotification('Ошибка: Библиотека Janus не загружена', 'error');
-        return;
-    }
+    // Проверяем периодически, загрузился ли Janus
+    const checkJanusInterval = setInterval(() => {
+        if (typeof Janus !== 'undefined') {
+            clearInterval(checkJanusInterval);
+            janusLoaded = true;
+            showNotification('Библиотека Janus загружена', 'success');
+            updateJanusStatus(true);
+            populateDeviceSelectors();
+            setupEventListeners();
+        }
+    }, 1000);
 
-    populateDeviceSelectors();
-    setupEventListeners();
+    // Таймаут для проверки Janus
+    setTimeout(() => {
+        if (!janusLoaded) {
+            showNotification('Не удалось загрузить библиотеку Janus. Проверьте подключение к интернету.', 'error');
+        }
+    }, 10000);
 }
 
 function setupEventListeners() {
