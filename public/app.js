@@ -4,6 +4,7 @@ const SIGNALING_SERVER =
     ? "http://localhost:3000"
     : window.location.origin;
 
+// Xirsys TURN/STUN
 const ICE_CONFIG = {
   iceServers: [
     {
@@ -16,10 +17,11 @@ const ICE_CONFIG = {
         "turns:fr-turn3.xirsys.com:443?transport=tcp",
         "turns:fr-turn3.xirsys.com:5349?transport=tcp"
       ],
-      username: "B0UKGM_7iTKBEwxa1dB6bNj18YKk4Vm-Fo7a3ddF4G8gshE2GgC_0tLJnF8DGtPnAAAAAGjHzn1Qcm9kb29zc2Vy",
-      credential: "24cbbacc-920e-11f0-82f1-e25abca605ee"
-    }
-  ]
+      username:
+        "B0UKGM_7iTKBEwxa1dB6bNj18YKk4Vm-Fo7a3ddF4G8gshE2GgC_0tLJnF8DGtPnAAAAAGjHzn1Qcm9kb29zc2Vy",
+      credential: "24cbbacc-920e-11f0-82f1-e25abca605ee",
+    },
+  ],
 };
 
 /* ======= Элементы ======= */
@@ -60,7 +62,7 @@ function addChat(user, text) {
   chatEl.scrollTop = chatEl.scrollHeight;
 }
 
-/* ======= WebRTC & Socket ======= */
+/* ======= WebRTC ======= */
 async function startLocalMedia() {
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
@@ -100,7 +102,7 @@ function createPeerConnection() {
   };
 }
 
-/* ===== Socket.IO ===== */
+/* ====== События Socket.IO ====== */
 function setupSocket() {
   socket = io(SIGNALING_SERVER);
 
@@ -121,12 +123,13 @@ function setupSocket() {
     await pc.setRemoteDescription(new RTCSessionDescription(sdp));
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
-    socket.emit("answer", { to: from, sdp: pc.localDescription });
+    socket.emit("answer", { room: roomId, sdp: pc.localDescription });
     log("Sent answer to " + from);
   });
 
   socket.on("answer", async ({ from, sdp }) => {
     log("Received answer from " + from);
+    peerSocketId = from;
     await pc.setRemoteDescription(new RTCSessionDescription(sdp));
   });
 
@@ -158,7 +161,7 @@ function setupSocket() {
   });
 }
 
-/* ======= Join ======= */
+/* ======= Join / Start logic ======= */
 joinBtn.onclick = async () => {
   roomId = roomIdInput.value.trim();
   role = roleSelect.value;
@@ -176,16 +179,14 @@ joinBtn.onclick = async () => {
   socket.emit("join-room", roomId, role);
   log("Joined room " + roomId + " as " + role);
 
-  socket.on("connect", async () => {
+  if (role === "teacher") {
     setTimeout(async () => {
-      if (role === "teacher") {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.emit("offer", { to: null, sdp: pc.localDescription, room: roomId });
-        log("Teacher: created offer and emitted (broadcast)");
-      }
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit("offer", { room: roomId, sdp: pc.localDescription });
+      log("Teacher: created offer and emitted");
     }, 500);
-  });
+  }
 };
 
 /* ====== Leave ====== */
@@ -211,7 +212,7 @@ leaveBtn.onclick = () => {
 sendChatBtn.onclick = () => {
   const text = chatInput.value.trim();
   if (!text) return;
-  addChat(role, text);
+  addChat(role, text); // только локальное имя
   if (socket) socket.emit("message", { room: roomId, user: role, text });
   chatInput.value = "";
 };
