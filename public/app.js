@@ -22,7 +22,6 @@ const ICE_CONFIG = {
       credential: "24cbbacc-920e-11f0-82f1-e25abca605ee",
     },
   ],
-  iceTransportPolicy: "relay"
 };
 
 /* ======= Элементы ======= */
@@ -34,7 +33,7 @@ const roomIdInput = document.getElementById("roomId");
 const roleSelect = document.getElementById("roleSelect");
 const statusSpan = document.getElementById("status");
 const showRoom = document.getElementById("showRoom");
-const socketIdSpan = document.getElementById("socketId"); // может быть null
+const socketIdSpan = document.getElementById("socketId");
 const logEl = document.getElementById("log");
 const chatEl = document.getElementById("chat");
 const chatInput = document.getElementById("chatInput");
@@ -49,14 +48,12 @@ let peerSocketId = null;
 
 /* ======= Утилиты ======= */
 function log(msg) {
-  if (!logEl) return;
   const d = document.createElement("div");
   d.textContent = msg;
   logEl.appendChild(d);
   logEl.scrollTop = logEl.scrollHeight;
 }
 function addChat(user, text) {
-  if (!chatEl) return;
   const d = document.createElement("div");
   d.className = "msg";
   d.innerHTML = `<b>${user}:</b> ${text}`;
@@ -69,11 +66,7 @@ async function startLocalMedia() {
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
       video: true,
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        sampleRate: 48000,
-      },
+      audio: true,
     });
     localVideo.srcObject = localStream;
   } catch (e) {
@@ -104,22 +97,16 @@ function createPeerConnection() {
   };
 
   pc.onconnectionstatechange = () => {
-    if (statusSpan) statusSpan.textContent = pc.connectionState;
+    statusSpan.textContent = pc.connectionState;
     log("PC state: " + pc.connectionState);
   };
 }
 
 async function makeOffer() {
   const offer = await pc.createOffer();
-  offer.sdp = preferOpus(offer.sdp);
   await pc.setLocalDescription(offer);
   socket.emit("offer", { to: peerSocketId, sdp: pc.localDescription });
   log("Sent offer to " + peerSocketId);
-}
-
-function preferOpus(sdp) {
-  if (!sdp) return sdp;
-  return sdp.replace(/(m=audio.*?)( 9)/, "$1 111 9");
 }
 
 /* ======= Socket ======= */
@@ -127,7 +114,7 @@ function setupSocket() {
   socket = io(SIGNALING_SERVER);
 
   socket.on("connect", () => {
-    if (socketIdSpan) socketIdSpan.textContent = socket.id;
+    socketIdSpan.textContent = socket.id;
     log("Connected to signaling server: " + socket.id);
     socket.emit("join-room", roomId, role);
   });
@@ -150,7 +137,6 @@ function setupSocket() {
       if (!pc) createPeerConnection();
       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
       const answer = await pc.createAnswer();
-      answer.sdp = preferOpus(answer.sdp);
       await pc.setLocalDescription(answer);
       socket.emit("answer", { to: from, sdp: pc.localDescription });
       log("Sent answer to " + from);
@@ -189,49 +175,43 @@ function setupSocket() {
 }
 
 /* ======= Join / Leave ======= */
-if (joinBtn) {
-  joinBtn.onclick = async () => {
-    roomId = roomIdInput.value.trim();
-    role = roleSelect.value;
-    if (!roomId) return alert("Укажи Room ID");
+joinBtn.onclick = async () => {
+  roomId = roomIdInput.value.trim();
+  role = roleSelect.value;
+  if (!roomId) return alert("Укажи Room ID");
 
-    if (showRoom) showRoom.textContent = roomId;
-    if (statusSpan) statusSpan.textContent = "connecting...";
-    joinBtn.disabled = true;
-    if (leaveBtn) leaveBtn.disabled = false;
+  showRoom.textContent = roomId;
+  statusSpan.textContent = "connecting...";
+  joinBtn.disabled = true;
+  leaveBtn.disabled = false;
 
-    await startLocalMedia();
-    createPeerConnection();
-    setupSocket();
-  };
-}
+  await startLocalMedia();
+  createPeerConnection();
+  setupSocket();
+};
 
-if (leaveBtn) {
-  leaveBtn.onclick = () => {
-    if (socket) socket.disconnect();
-    if (pc) {
-      pc.close();
-      pc = null;
-    }
-    if (localStream) {
-      localStream.getTracks().forEach((t) => t.stop());
-      localStream = null;
-    }
-    remoteVideo.srcObject = null;
-    localVideo.srcObject = null;
-    if (joinBtn) joinBtn.disabled = false;
-    if (leaveBtn) leaveBtn.disabled = true;
-    if (statusSpan) statusSpan.textContent = "not connected";
-    log("Left room");
-  };
-}
+leaveBtn.onclick = () => {
+  if (socket) socket.disconnect();
+  if (pc) {
+    pc.close();
+    pc = null;
+  }
+  if (localStream) {
+    localStream.getTracks().forEach((t) => t.stop());
+    localStream = null;
+  }
+  remoteVideo.srcObject = null;
+  localVideo.srcObject = null;
+  joinBtn.disabled = false;
+  leaveBtn.disabled = true;
+  statusSpan.textContent = "not connected";
+  log("Left room");
+};
 
 /* ===== Chat ===== */
-if (sendChatBtn) {
-  sendChatBtn.onclick = () => {
-    const text = chatInput.value.trim();
-    if (!text) return;
-    if (socket) socket.emit("message", { room: roomId, user: role, text });
-    chatInput.value = "";
-  };
-}
+sendChatBtn.onclick = () => {
+  const text = chatInput.value.trim();
+  if (!text) return;
+  if (socket) socket.emit("message", { room: roomId, user: role, text });
+  chatInput.value = "";
+};
