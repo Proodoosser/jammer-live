@@ -4,8 +4,9 @@ const SIGNALING_SERVER =
     ? "http://localhost:3000"
     : window.location.origin;
 
-// Xirsys ICE (лучше обновлять динамически, пока — статический)
+// ICE config (relay-only через Xirsys)
 const ICE_CONFIG = {
+  iceTransportPolicy: "relay",
   iceServers: [
     {
       urls: [
@@ -15,14 +16,13 @@ const ICE_CONFIG = {
         "turn:fr-turn3.xirsys.com:80?transport=tcp",
         "turn:fr-turn3.xirsys.com:3478?transport=tcp",
         "turns:fr-turn3.xirsys.com:443?transport=tcp",
-        "turns:fr-turn3.xirsys.com:5349?transport=tcp"
+        "turns:fr-turn3.xirsys.com:5349?transport=tcp",
       ],
       username:
         "B0UKGM_7iTKBEwxa1dB6bNj18YKk4Vm-Fo7a3ddF4G8gshE2GgC_0tLJnF8DGtPnAAAAAGjHzn1Qcm9kb29zc2Vy",
       credential: "24cbbacc-920e-11f0-82f1-e25abca605ee",
     },
   ],
-  iceTransportPolicy: "relay"
 };
 
 /* ======= Элементы ======= */
@@ -66,12 +66,8 @@ function addChat(user, text) {
 async function startLocalMedia() {
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        sampleRate: 48000,
-      },
+      video: { width: { ideal: 640 }, height: { ideal: 360 } },
+      audio: { echoCancellation: true, noiseSuppression: true },
     });
     localVideo.srcObject = localStream;
   } catch (e) {
@@ -109,15 +105,21 @@ function createPeerConnection() {
 
 async function makeOffer() {
   const offer = await pc.createOffer();
-  offer.sdp = preferOpus(offer.sdp);
+  // 🟢 приоритет Opus
+  if (offer.sdp) {
+    offer.sdp = offer.sdp.replace(
+      /(m=audio .*RTP\/SAVPF )([0-9 ]+)/,
+      (match, prefix, codecs) => {
+        const opus = codecs.split(" ").find((c) => {
+          return offer.sdp.includes(`a=rtpmap:${c} opus/48000`);
+        });
+        return opus ? `${prefix}${opus} ${codecs.replace(opus, "").trim()}` : match;
+      }
+    );
+  }
   await pc.setLocalDescription(offer);
   socket.emit("offer", { to: peerSocketId, sdp: pc.localDescription });
   log("Sent offer to " + peerSocketId);
-}
-
-function preferOpus(sdp) {
-  if (!sdp) return sdp;
-  return sdp.replace(/(m=audio.*?)( 9)/, "$1 111 9");
 }
 
 /* ======= Socket ======= */
@@ -148,7 +150,17 @@ function setupSocket() {
       if (!pc) createPeerConnection();
       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
       const answer = await pc.createAnswer();
-      answer.sdp = preferOpus(answer.sdp);
+      if (answer.sdp) {
+        answer.sdp = answer.sdp.replace(
+          /(m=audio .*RTP\/SAVPF )([0-9 ]+)/,
+          (match, prefix, codecs) => {
+            const opus = codecs.split(" ").find((c) => {
+              return answer.sdp.includes(`a=rtpmap:${c} opus/48000`);
+            });
+            return opus ? `${prefix}${opus} ${codecs.replace(opus, "").trim()}` : match;
+          }
+        );
+      }
       await pc.setLocalDescription(answer);
       socket.emit("answer", { to: from, sdp: pc.localDescription });
       log("Sent answer to " + from);
@@ -186,24 +198,46 @@ function setupSocket() {
   });
 }
 
-/* ======= Join / Leave ======= */
-joinBtn.onclick = async () => {
+/* ===== Chat ===== */
+sendChatBtn.onclick = () => {
+  const text = chatInput.value.trim();
+  if (!text) return;
+  if (socket) socket.emit("message", { room: roomId, user: role, text });
+  chatInput.value = "";
+};
+
+/* ===== Обратная совместимость (HTML) ===== */
+async function joinAs(r) {
+  role = r;
   roomId = roomIdInput.value.trim();
-  role = roleSelect.value;
-  if (!roomId) return alert("Укажи Room ID");
+  if (!roomId) {
+    alert("Укажи Room ID");
+    return;
+  }
 
   showRoom.textContent = roomId;
   statusSpan.textContent = "connecting...";
   joinBtn.disabled = true;
   leaveBtn.disabled = false;
 
-  await startLocalMedia();
-  createPeerConnection();
-  setupSocket();
-};
+  try {
+    await startLocalMedia();
+    createPeerConnection();
+    setupSocket();
+  } catch (err) {
+    console.error("Ошибка при joinAs:", err);
+    alert("Не удалось подключиться: " + err.message);
+    joinBtn.disabled = false;
+    leaveBtn.disabled = true;
+    statusSpan.textContent = "not connected";
+  }
+}
 
-leaveBtn.onclick = () => {
-  if (socket) socket.disconnect();
+function leaveRoom() {
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
   if (pc) {
     pc.close();
     pc = null;
@@ -214,16 +248,9 @@ leaveBtn.onclick = () => {
   }
   remoteVideo.srcObject = null;
   localVideo.srcObject = null;
+
   joinBtn.disabled = false;
   leaveBtn.disabled = true;
   statusSpan.textContent = "not connected";
   log("Left room");
-};
-
-/* ===== Chat ===== */
-sendChatBtn.onclick = () => {
-  const text = chatInput.value.trim();
-  if (!text) return;
-  if (socket) socket.emit("message", { room: roomId, user: role, text });
-  chatInput.value = "";
-};
+}
