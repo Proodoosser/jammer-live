@@ -1,27 +1,10 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Jammer — Live</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Jammer Live</title>
   <style>
-    body { margin:0; font-family: sans-serif; background:#111; color:#eee; display:flex; flex-direction:column; height:100vh; }
-    header { padding:8px; background:#222; display:flex; gap:8px; align-items:center; }
-    header input, header select { padding:6px; }
-    header button { padding:6px 10px; cursor:pointer; }
-    #videos { flex:1; display:flex; gap:10px; padding:10px; }
-    video { background:#000; flex:1; border-radius:8px; }
-    #chat { width:320px; background:#181818; display:flex; flex-direction:column; }
-    #chatArea { flex:1; overflow:auto; padding:10px; }
-    .msg { margin:4px 0; }
-    .teacher { color:#2f80ed; }
-    .student { color:#4caf50; }
-    .system { color:#888; font-style:italic; }
-    #chatInput { display:flex; gap:6px; padding:6px; }
-    #chatInput input { flex:1; padding:6px; }
     body { font-family: sans-serif; padding: 1em; background: #111; color: #eee; }
     video { width: 45%; background: #000; margin: 0.5em; border: 2px solid #444; }
     #controls { margin: 1em 0; }
@@ -31,12 +14,6 @@
   </style>
 </head>
 <body>
-  <header>
-    <input id="roomId" value="lesson123" />
-    <select id="roleSelect">
-      <option value="teacher">Teacher</option>
-      <option value="student">Student</option>
-    </select>
   <h1>🎸 Jammer Live</h1>
 
   <div id="controls">
@@ -49,28 +26,13 @@
     </label>
     <button id="joinBtn">Join</button>
     <button id="leaveBtn" disabled>Leave</button>
-    <span id="status">disconnected</span>
-  </header>
   </div>
 
-  <div style="flex:1; display:flex; overflow:hidden;">
-    <div id="videos">
-      <video id="localVideo" autoplay playsinline muted></video>
-      <video id="remoteVideo" autoplay playsinline></video>
-    </div>
-    <div id="chat">
-      <div id="chatArea"></div>
-      <div id="chatInput">
-        <input id="chatMsg" placeholder="Message..." />
-        <button id="sendBtn">Send</button>
-      </div>
-    </div>
   <div>
     <video id="localVideo" autoplay playsinline muted></video>
     <video id="remoteVideo" autoplay playsinline></video>
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
   <div>Status: <span id="status">not connected</span> | Room: <span id="showRoom">-</span> | SocketID: <span id="socketId">-</span></div>
 
   <div id="chat"></div>
