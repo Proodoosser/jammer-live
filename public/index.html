@@ -1,223 +1,559 @@
-// public/app.js
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jammer — Telegram style</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0b0c;
+    --panel:#0f1113;
+    --muted:#9aa4ad;
+    --accent:#2f80ed;
+    --bubble-teacher:#e8f0ff;
+    --bubble-student:#e8ffe8;
+    --bubble-system:#2b2b2b;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:#e6eef6;
+    font-family:Inter,system-ui,Segoe UI,Roboto,Arial;
+    -webkit-font-smoothing:antialiased;
+    height:100vh;
+    display:flex;
+  }
+
+  /* layout */
+  .app {
+    display:grid;
+    grid-template-columns: minmax(320px, 1fr) 380px;
+    width:100%;
+    gap:12px;
+    padding:12px;
+    align-items:stretch;
+  }
+
+  /* LEFT: video + controls */
+  .left {
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    border-radius:12px;
+    padding:12px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    min-height:0;
+  }
+
+  .top-controls{
+    display:flex;
+    gap:8px;
+    align-items:center;
+  }
+  .top-controls input[type=text]{
+    background:#0a0a0b;
+    border:1px solid #1f1f1f;
+    color:#ddd;
+    padding:8px 10px;
+    border-radius:8px;
+    width:220px;
+  }
+  .top-controls select{
+    background:#0a0a0b;border:1px solid #1f1f1f;color:#ddd;padding:8px;border-radius:8px;
+  }
+  .btn{
+    background:var(--accent);
+    color:white;padding:8px 12px;border-radius:8px;border:none;font-weight:600;cursor:pointer;
+  }
+  .btn.ghost{background:transparent;border:1px solid #222;color:var(--muted)}
+  .status{
+    margin-left:auto;color:var(--muted);font-size:13px;
+  }
+
+  .video-stage{
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    justify-content:space-between;
+    flex:1;
+    min-height:0;
+  }
+
+  /* main / mini wrappers */
+  .video-wrap{
+    position:relative;
+    background:#000;
+    border-radius:10px;
+    overflow:hidden;
+    flex:1 1 0%;
+    min-height:200px;
+    border:1px solid rgba(255,255,255,0.03);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  video{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .video-mini {
+    position:absolute;
+    width:180px;
+    height:110px;
+    bottom:12px;
+    right:12px;
+    border-radius:8px;
+    overflow:hidden;
+    border:2px solid rgba(255,255,255,0.06);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    cursor:grab;
+    touch-action:none;
+    background:#000;
+    z-index:40;
+  }
+  .video-mini video{ width:100%; height:100%; object-fit:cover; }
+
+  .video-main { flex:1; min-width:200px; }
+
+  /* video controls */
+  .video-actions{
+    display:flex;gap:8px;margin-top:8px;
+  }
+  .small-btn{ padding:6px 8px; border-radius:8px; border:1px solid rgba(255,255,255,0.03); background:transparent; color:#ddd; cursor:pointer; }
+
+  /* RIGHT: chat panel */
+  .right {
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    border-radius:12px;
+    padding:12px;
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+  }
+  .chat-header{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .chat-title{ font-weight:600; font-size:16px; }
+  .chat-area{
+    flex:1;
+    overflow:auto;
+    padding:8px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  /* bubbles */
+  .bubble{
+    max-width:78%;
+    padding:10px 12px;
+    border-radius:14px;
+    display:inline-block;
+    position:relative;
+    font-size:14px;
+    line-height:1.25;
+    word-break:break-word;
+  }
+  .row{ display:flex; gap:8px; align-items:flex-end; }
+  .row.right{ justify-content:flex-end; }
+  .avatar{
+    width:36px;height:36px;border-radius:50%;flex:0 0 36px;background:#2b2b2b;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;
+  }
+
+  .bubble.teacher{
+    background:var(--bubble-teacher);
+    color:#0c2340;
+    border-bottom-right-radius:4px;
+  }
+  .bubble.student{
+    background:var(--bubble-student);
+    color:#083b08;
+    border-bottom-left-radius:4px;
+  }
+  .bubble.system{
+    background:transparent;
+    color:var(--muted);
+    font-style:italic;
+    max-width:100%;
+    padding:4px 0;
+  }
+  .ts{ display:block;font-size:11px;color:var(--muted); margin-top:6px; }
+
+  .chat-input{
+    margin-top:8px; display:flex; gap:8px; align-items:center;
+  }
+  .chat-input input{
+    flex:1; padding:10px;border-radius:10px;border:1px solid #222;background:#0b0b0b;color:#eee;
+  }
+  .chat-input button{ padding:10px 14px; border-radius:10px; border:none; background:var(--accent); color:white; font-weight:600; cursor:pointer; }
+
+  /* responsive */
+  @media (max-width:900px){
+    .app{ grid-template-columns: 1fr; grid-auto-rows:auto; padding:8px; }
+    .right{ order:2; margin-top:8px; }
+    .left{ order:1; }
+    .video-mini{ width:140px; height:92px; }
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+
+    <!-- LEFT: videos and controls -->
+    <div class="left">
+      <div class="top-controls">
+        <input id="roomId" type="text" value="lesson123" placeholder="Room id (lesson123)">
+        <select id="roleSelect">
+          <option value="teacher">Teacher</option>
+          <option value="student">Student</option>
+        </select>
+        <button class="btn" id="joinBtn">Join</button>
+        <button class="btn ghost" id="leaveBtn" disabled>Leave</button>
+
+        <div class="status" id="status">not connected</div>
+      </div>
+
+      <div class="video-stage">
+        <div class="video-wrap video-main" id="mainWrap">
+          <!-- main large video (remote by default) -->
+          <video id="remoteVideo" autoplay playsinline></video>
+
+          <!-- mini overlay (self preview by default) - draggable -->
+          <div class="video-mini" id="miniWrap" title="Drag me / click to swap">
+            <video id="localVideo" autoplay playsinline muted></video>
+          </div>
+        </div>
+      </div>
+
+      <div class="video-actions">
+        <button class="small-btn" id="swapBtn" title="Swap main / mini">Swap view</button>
+        <button class="small-btn" id="pipBtn" title="Mini toggle">Toggle mini</button>
+        <button class="small-btn" id="muteBtn" title="Mute/Unmute">Mute</button>
+        <button class="small-btn" id="camBtn" title="Camera on/off">Cam</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: chat -->
+    <div class="right">
+      <div class="chat-header">
+        <div class="chat-title">Jammer Chat</div>
+        <div style="margin-left:auto;color:var(--muted);font-size:13px">Room: <span id="showRoom">—</span></div>
+      </div>
+
+      <div class="chat-area" id="chatArea">
+        <!-- bubbles will be appended here -->
+      </div>
+
+      <div class="chat-input">
+        <input id="chatInput" placeholder="Write a message...">
+        <button id="sendChatBtn">Send</button>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+  // small UI helpers used by app.js: swap/mini/drag/mute/cam
+  window._ui = (function(){
+    const mini = document.getElementById('miniWrap');
+    const main = document.getElementById('mainWrap');
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    let miniVisible = true;
+    let dragging = false;
+    let offset = {x:0,y:0};
+
+    function swapViews(){
+      // swap video elements between main and mini
+      const mainVid = main.querySelector('video');
+      const miniVid = mini.querySelector('video');
+      // swap srcObject by swapping nodes
+      const a = mainVid.cloneNode();
+      const b = miniVid.cloneNode();
+      // copy attributes
+      a.autoplay = true; a.playsInline = true;
+      b.autoplay = true; b.playsInline = true; b.muted = true;
+      // swap DOM nodes
+      main.replaceChild(b, mainVid);
+      mini.replaceChild(a, miniVid);
+      // if app.js sets srcObject later, it will update nodes — no hoop-jumping
+// app.js — Jammer (Telegram style)
 
 const socket = io();
-let localStream = null;
-let pc = null;
-let remoteStream = null;
-let role = null;
+let pc;
+let localStream;
+let remoteStream;
 
+// DOM refs
+const roomInput = document.getElementById("roomId");
+const roleSelect = document.getElementById("roleSelect");
+const joinBtn = document.getElementById("joinBtn");
+const leaveBtn = document.getElementById("leaveBtn");
 const statusEl = document.getElementById("status");
-const localVideo = document.getElementById("localVideo");
-const remoteVideo = document.getElementById("remoteVideo");
-const joinTeacherBtn = document.getElementById("join-teacher");
-const joinStudentBtn = document.getElementById("join-student");
-const leaveBtn = document.getElementById("leave");
 const chatArea = document.getElementById("chatArea");
 const chatInput = document.getElementById("chatInput");
-const sendBtn = document.getElementById("sendBtn");
+const sendChatBtn = document.getElementById("sendChatBtn");
+const localVideo = document.getElementById("localVideo");
+const remoteVideo = document.getElementById("remoteVideo");
 
-// ----------- Utility -----------
-function log(msg) {
-  console.log(msg);
-  if (statusEl) statusEl.textContent = msg;
+// helpers
+function setStatus(txt) {
+  if (statusEl) statusEl.textContent = txt;
 }
 
-function addChat(msg, who = "system") {
-  if (!chatArea) return;
-  const div = document.createElement("div");
-  div.className =
-    who === "me"
-      ? "chat-bubble me"
-      : who === "other"
-      ? "chat-bubble other"
-      : "chat-bubble system";
-  div.textContent = msg;
-  chatArea.appendChild(div);
-  chatArea.scrollTop = chatArea.scrollHeight;
-}
-
-// ----------- Media Setup -----------
-async function initMedia() {
-  try {
-    log("Запрос getUserMedia...");
-    localStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      },
-      video: true
-    });
-    if (localVideo) localVideo.srcObject = localStream;
-    log("Микрофон и камера получены");
-  } catch (err) {
-    console.error("Ошибка getUserMedia:", err);
-    alert("Не удалось получить доступ к камере/микрофону");
+function addChat(user, text) {
+  if (typeof window.addChat === "function") {
+    window.addChat(user, text);
+  } else {
+    const div = document.createElement("div");
+    div.textContent = `${user}: ${text}`;
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
   }
 }
 
-// ----------- Peer Connection -----------
-function createPeerConnection() {
-  log("Создаем RTCPeerConnection...");
+// ---- join / leave ----
+async function joinAs(role) {
+  const roomId = roomInput.value.trim();
+  if (!roomId) {
+    alert("Enter room id");
+    return;
+  }
+  setStatus("Connecting…");
+  joinBtn.disabled = true;
 
+  // create peerconnection
   pc = new RTCPeerConnection({
     iceServers: [
       {
-        urls: [
-          "stun:stun.l.google.com:19302"
-        ]
+        urls: "turn:global.xirsys.net:3478?transport=udp",
+        username: "Prodoosser",
+        credential: "c673ce8e-920c-11f0-8f21-4662eff0c0a9",
       },
       {
-        urls: [
-          "turn:global.xirsys.net:3478?transport=udp",
-          "turn:global.xirsys.net:3478?transport=tcp"
-        ],
+        urls: "turn:global.xirsys.net:3478?transport=tcp",
         username: "Prodoosser",
-        credential: "c673ce8e-920c-11f0-8f21-4662eff0c0a9"
-      }
+        credential: "c673ce8e-920c-11f0-8f21-4662eff0c0a9",
+      },
     ],
-    iceTransportPolicy: "relay"
+    iceTransportPolicy: "relay",
   });
 
+  // remote track
   remoteStream = new MediaStream();
-  if (remoteVideo) remoteVideo.srcObject = remoteStream;
+  remoteVideo.srcObject = remoteStream;
+  pc.ontrack = (e) => {
+    e.streams[0].getTracks().forEach((t) => remoteStream.addTrack(t));
+  };
 
-  pc.onicecandidate = (event) => {
-    if (event.candidate) {
-      log("ICE candidate отправлен");
-      socket.emit("candidate", event.candidate);
+  // ICE
+  pc.onicecandidate = (e) => {
+    if (e.candidate) {
+      socket.emit("candidate", { candidate: e.candidate, roomId });
     }
-  };
 
-  pc.ontrack = (event) => {
-    log("ontrack вызван, track.kind=" + event.track.kind);
-    if (event.streams && event.streams[0]) {
-      log("Назначаем remoteVideo поток");
-      if (remoteVideo) remoteVideo.srcObject = event.streams[0];
-    } else {
-      log("Добавляем track вручную в remoteStream");
-      remoteStream.addTrack(event.track);
+    function toggleMini(){
+      miniVisible = !miniVisible;
+      mini.style.display = miniVisible ? 'block' : 'none';
     }
+
+    // simple drag for mini
+    mini.addEventListener('pointerdown', (e)=>{
+      dragging = true;
+      mini.setPointerCapture(e.pointerId);
+      offset.x = e.clientX - mini.offsetLeft;
+      offset.y = e.clientY - mini.offsetTop;
+      mini.style.cursor = 'grabbing';
   };
 
-  pc.onconnectionstatechange = () => {
-    log("connectionState: " + pc.connectionState);
-  };
-
-  if (localStream) {
-    localStream.getTracks().forEach((track) => {
-      pc.addTrack(track, localStream);
-    });
-    log("Добавлены локальные треки");
-  }
-}
-
-// ----------- Signaling -----------
-async function makeOffer() {
-  createPeerConnection();
-  const offer = await pc.createOffer();
-  let sdp = preferOpus(offer.sdp);
-  await pc.setLocalDescription({ type: "offer", sdp });
-  log("Offer создан и локально установлен");
-  socket.emit("offer", pc.localDescription);
-}
-
-async function handleOffer(offer) {
-  createPeerConnection();
-  await pc.setRemoteDescription(new RTCSessionDescription(offer));
-  const answer = await pc.createAnswer();
-  let sdp = preferOpus(answer.sdp);
-  await pc.setLocalDescription({ type: "answer", sdp });
-  log("Answer создан и локально установлен");
-  socket.emit("answer", pc.localDescription);
-}
-
-async function handleAnswer(answer) {
-  await pc.setRemoteDescription(new RTCSessionDescription(answer));
-  log("Answer применен как удаленный SDP");
-}
-
-async function handleCandidate(candidate) {
+  // local media
   try {
-    await pc.addIceCandidate(new RTCIceCandidate(candidate));
-    log("ICE candidate добавлен");
-  } catch (e) {
-    console.error("Ошибка добавления candidate", e);
-  }
-}
+    localStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 2,
+        echoCancellation: true,
+        noiseSuppression: true,
+      },
+      video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+    });
+    window.addEventListener('pointerup', (e)=>{
+      if(dragging){
+        dragging = false;
+        mini.style.cursor = 'grab';
+      }
+    });
+    window.addEventListener('pointermove', (e)=>{
+      if(!dragging) return;
+      const x = e.clientX - offset.x;
+      const y = e.clientY - offset.y;
+      // clamp inside left panel
+      const leftRect = document.querySelector('.left').getBoundingClientRect();
+      const maxX = leftRect.width - mini.offsetWidth - 12;
+      const maxY = leftRect.height - mini.offsetHeight - 12;
+      mini.style.left = Math.max(8, Math.min(maxX, x)) + 'px';
+      mini.style.top = Math.max(8, Math.min(maxY, y)) + 'px';
+      mini.style.right = 'auto';
+      mini.style.bottom = 'auto';
+      mini.style.position = 'absolute';
+    });
 
-// ----------- SDP Helpers -----------
-function preferOpus(sdp) {
-  const lines = sdp.split("\r\n");
-  let mLineIndex = null;
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].indexOf("m=audio") === 0) {
-      mLineIndex = i;
-      break;
+    // Expose API
+    return {
+      swapViews,
+      toggleMini,
+      getMiniEl: ()=>mini
+    };
+  })();
+
+  // wire UI buttons (app.js will also set handlers)
+  document.getElementById('swapBtn').addEventListener('click', ()=>window._ui.swapViews());
+  document.getElementById('pipBtn').addEventListener('click', ()=>window._ui.toggleMini());
+
+  // chat rendering helper (app.js calls addChat(user,text))
+  // We'll override global addChat if present — but keep compatibility:
+  (function(){
+    const chatArea = document.getElementById('chatArea');
+
+    // if app.js defines addChat, it will replace this; otherwise we expose a safe one
+    if(typeof window.addChat !== 'function'){
+      window.addChat = function(user, text){
+        const row = document.createElement('div');
+        const isSystem = (user === 'system');
+        row.className = 'row ' + (isSystem ? '' : (user === 'teacher'? 'right' : 'left'));
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar';
+        avatar.textContent = (isSystem? '•' : (user? user[0].toUpperCase() : 'U'));
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble ' + (isSystem? 'system' : user);
+        bubble.innerHTML = `<div>${text}</div><span class="ts">${new Date().toLocaleTimeString()}</span>`;
+        if(user === 'teacher'){
+          row.appendChild(bubble); row.appendChild(avatar);
+        } else if(user === 'student'){
+          row.appendChild(avatar); row.appendChild(bubble);
+        } else {
+          row.appendChild(bubble);
+        }
+        chatArea.appendChild(row);
+        chatArea.scrollTop = chatArea.scrollHeight;
+      };
+    } else {
+      // If app.js already exposes addChat, hook to render nicer bubbles:
+      const original = window.addChat;
+      window.addChat = function(user, text){
+        original(user, text); // keep whatever it did
+        try {
+          // try to render nicely by moving last .msg into bubble format
+          const last = document.querySelector('#chatArea .msg:last-child');
+          if(last){
+            // convert last into our bubble UI
+            const t = last.innerText || last.textContent;
+            last.remove();
+            window.addChat(user, text);
+          }
+        }catch(e){}
+      };
+    localVideo.srcObject = localStream;
+    localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
+  } catch (err) {
+    console.error("getUserMedia error", err);
+    alert("Could not access mic/camera");
+    return;
+  }
+
+  // socket events
+  socket.emit("join", { roomId, role });
+
+  socket.on("offer", async (offer) => {
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await pc.createAnswer();
+    preferOpus(answer);
+    await pc.setLocalDescription(answer);
+    socket.emit("answer", { answer, roomId });
+  });
+
+  socket.on("answer", async (answer) => {
+    await pc.setRemoteDescription(new RTCSessionDescription(answer));
+  });
+
+  socket.on("candidate", async (msg) => {
+    try {
+      await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+    } catch (err) {
+      console.error("ICE add error", err);
     }
+  })();
+</script>
+
+<!-- load signalling & app logic -->
+<script src="/socket.io/socket.io.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
+  });
+
+  socket.on("chat", (msg) => {
+    addChat(msg.user, msg.text);
+  });
+
+  setStatus("Connected");
+  leaveBtn.disabled = false;
+}
+
+function leaveRoom() {
+  if (pc) {
+    pc.close();
+    pc = null;
   }
-  if (mLineIndex === null) return sdp;
-
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].toLowerCase().includes("opus/48000")) {
-      const opusPayload = lines[i].match(/:(\d+) /)[1];
-      const mLine = lines[mLineIndex].split(" ");
-      const newLine = [mLine[0], mLine[1], mLine[2], opusPayload].concat(
-        mLine.slice(3).filter((pt) => pt !== opusPayload)
-      );
-      lines[mLineIndex] = newLine.join(" ");
-      break;
-    }
+  if (socket) {
+    socket.emit("leave", { roomId: roomInput.value });
   }
-  return lines.join("\r\n");
-}
-
-// ----------- Socket Events -----------
-socket.on("connect", () => {
-  log("Соединение с сервером установлено");
-});
-
-socket.on("offer", handleOffer);
-socket.on("answer", handleAnswer);
-socket.on("candidate", handleCandidate);
-
-socket.on("chat", (msg) => {
-  addChat(msg, "other");
-});
-
-// ----------- UI Buttons -----------
-async function joinAs(r) {
-  role = r;
-  await initMedia();
-  if (role === "teacher") {
-    makeOffer();
+  if (localStream) {
+    localStream.getTracks().forEach((t) => t.stop());
+    localStream = null;
   }
-  socket.emit("join", role);
-  log("Вы вошли как " + role);
+  localVideo.srcObject = null;
+  remoteVideo.srcObject = null;
+  setStatus("Disconnected");
+  joinBtn.disabled = false;
+  leaveBtn.disabled = true;
 }
 
-if (joinTeacherBtn) {
-  joinTeacherBtn.onclick = () => joinAs("teacher");
+// prefer Opus
+function preferOpus(desc) {
+  if (!desc.sdp) return;
+  const lines = desc.sdp.split("\n");
+  const mLineIndex = lines.findIndex((l) => l.startsWith("m=audio"));
+  if (mLineIndex === -1) return;
+  const opusIdx = lines.findIndex(
+    (l) => l.toLowerCase().includes("opus/48000")
+  );
+  if (opusIdx === -1) return;
+  const opusPayload = lines[opusIdx].match(/:(\d+)/)[1];
+  const mLine = lines[mLineIndex].split(" ");
+  const newLine = [
+    mLine[0],
+    mLine[1],
+    mLine[2],
+    opusPayload,
+    ...mLine.slice(3).filter((x) => x !== opusPayload),
+  ];
+  lines[mLineIndex] = newLine.join(" ");
+  desc.sdp = lines.join("\n");
 }
-if (joinStudentBtn) {
-  joinStudentBtn.onclick = () => joinAs("student");
-}
-if (leaveBtn) {
-  leaveBtn.onclick = () => {
-    if (pc) pc.close();
-    if (localVideo) localVideo.srcObject = null;
-    if (remoteVideo) remoteVideo.srcObject = null;
-    log("Вышли из комнаты");
-    socket.emit("leave");
-  };
-}
-if (sendBtn) {
-  sendBtn.onclick = () => {
-    const msg = chatInput.value.trim();
-    if (msg) {
-      addChat(msg, "me");
-      socket.emit("chat", msg);
-      chatInput.value = "";
-    }
-  };
-}
+
+// ---- wire UI ----
+joinBtn.onclick = () => joinAs(roleSelect.value);
+leaveBtn.onclick = () => leaveRoom();
+
+sendChatBtn.onclick = () => {
+  const text = chatInput.value.trim();
+  if (!text) return;
+  const roomId = roomInput.value.trim();
+  const role = roleSelect.value;
+  addChat(role, text);
+  socket.emit("chat", { roomId, user: role, text });
+  chatInput.value = "";
+};
