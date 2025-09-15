@@ -1,15 +1,13 @@
-// Главные переменные
+// Главные переменные (сохранены ваши оригинальные)
 let socket = null;
 let janus = null;
-let opaqueId = null;
+let opaqueId = "live-lessons-"+Math.random().toString(36).substring(2, 15);
 let session = null;
 let pluginHandle = null;
 
 // Элементы DOM
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
-const localVideoInfo = document.getElementById('localVideoInfo');
-const remoteVideoInfo = document.getElementById('remoteVideoInfo');
 
 // Кнопки и инпуты
 const connectButton = document.getElementById('connectButton');
@@ -17,8 +15,6 @@ const callButton = document.getElementById('callButton');
 const hangupButton = document.getElementById('hangupButton');
 const toggleAudioButton = document.getElementById('toggleAudio');
 const toggleVideoButton = document.getElementById('toggleVideo');
-const settingsButton = document.getElementById('settingsButton');
-const applySettingsButton = document.getElementById('applySettings');
 
 const usernameInput = document.getElementById('usernameInput');
 const roomIdInput = document.getElementById('roomIdInput');
@@ -27,17 +23,13 @@ const roomIdInput = document.getElementById('roomIdInput');
 const socketStatus = document.getElementById('socketStatus');
 const janusStatus = document.getElementById('janusStatus');
 
-// Настройки
-const videoSourceSelect = document.getElementById('videoSource');
-const audioSourceSelect = document.getElementById('audioSource');
-const videoResolutionSelect = document.getElementById('videoResolution');
-const audioQualitySelect = document.getElementById('audioQuality');
-
 // Состояние приложения
 let localStream = null;
 let audioEnabled = true;
 let videoEnabled = true;
-let mediaConstraints = {
+
+// Ваши оригинальные медиа constraints
+const mediaConstraints = {
     audio: {
         channelCount: { ideal: 2 },
         echoCancellation: true,
@@ -51,98 +43,28 @@ let mediaConstraints = {
         frameRate: { ideal: 30, max: 60 }
     }
 };
-let currentSettings = { ...mediaConstraints };
-let janusLoaded = false;
 
-// ==================== УВЕДОМЛЕНИЯ ====================
-function showNotification(message, type = 'info', duration = 5000) {
-    const notificationArea = document.getElementById('notificationArea');
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    
-    let icon = 'info-circle';
-    if (type === 'success') icon = 'check-circle';
-    if (type === 'error') icon = 'exclamation-circle';
+// ==================== ИНИЦИАЛИЗАЦИЯ ====================
+document.addEventListener('DOMContentLoaded', function() {
+    setupEventListeners();
+});
 
-    notification.innerHTML = `<i class="fas fa-${icon}"></i> ${message}`;
-    notificationArea.appendChild(notification);
+// ==================== НАСТРОЙКА СЛУШАТЕЛЕЙ СОБЫТИЙ ====================
+function setupEventListeners() {
+    // Подключение к сигнальному серверу
+    connectButton.addEventListener('click', connectToSignalingServer);
 
-    // Анимация появления
-    setTimeout(() => notification.classList.add('show'), 10);
+    // Управление звонком
+    callButton.addEventListener('click', startCall);
+    hangupButton.addEventListener('click', hangupCall);
 
-    // Автоматическое скрытие
-    if (duration > 0) {
-        setTimeout(() => {
-            notification.classList.remove('show');
-            setTimeout(() => notification.remove(), 300);
-        }, duration);
-    }
-
-    return notification;
-}
-
-// ==================== ОБНОВЛЕНИЕ СТАТУСА ====================
-function updateSocketStatus(connected) {
-    const dot = socketStatus.querySelector('.status-dot');
-    const text = socketStatus.querySelector('span:last-child');
-    if (connected) {
-        dot.className = 'status-dot status-connected';
-        text.textContent = 'Signal: Подключен';
-    } else {
-        dot.className = 'status-dot status-disconnected';
-        text.textContent = 'Signal: Отключен';
-    }
-}
-
-function updateJanusStatus(connected) {
-    const dot = janusStatus.querySelector('.status-dot');
-    const text = janusStatus.querySelector('span:last-child');
-    if (connected) {
-        dot.className = 'status-dot status-connected';
-        text.textContent = 'Media: Подключен';
-    } else {
-        dot.className = 'status-dot status-disconnected';
-        text.textContent = 'Media: Отключен';
-    }
-}
-
-// ==================== УПРАВЛЕНИЕ УСТРОЙСТВАМИ ====================
-async function populateDeviceSelectors() {
-    try {
-        // Сначала запрашиваем разрешение на доступ к устройствам
-        await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-        
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        
-        // Очищаем селекты
-        videoSourceSelect.innerHTML = '<option value="">Выберите камеру</option>';
-        audioSourceSelect.innerHTML = '<option value="">Выберите микрофон</option>';
-        
-        // Добавляем устройства
-        devices.forEach(device => {
-            const option = document.createElement('option');
-            option.value = device.deviceId;
-            option.text = device.label || `Unknown ${device.kind}`;
-            
-            if (device.kind === 'videoinput') {
-                videoSourceSelect.appendChild(option);
-            } else if (device.kind === 'audioinput') {
-                audioSourceSelect.appendChild(option);
-            }
-        });
-    } catch (error) {
-        console.error('Error enumerating devices:', error);
-        showNotification('Не удалось получить список устройств', 'error');
-    }
+    // Управление медиа
+    toggleAudioButton.addEventListener('click', () => toggleMedia('audio'));
+    toggleVideoButton.addEventListener('click', () => toggleMedia('video'));
 }
 
 // ==================== ПОДКЛЮЧЕНИЕ К СИГНАЛЬНОМУ СЕРВЕРУ ====================
 function connectToSignalingServer() {
-    if (!janusLoaded) {
-        showNotification('Библиотека Janus еще не загружена. Подождите...', 'error');
-        return;
-    }
-
     const username = usernameInput.value.trim();
     const roomId = roomIdInput.value.trim();
 
@@ -152,16 +74,16 @@ function connectToSignalingServer() {
     }
 
     connectButton.disabled = true;
-    connectButton.innerHTML = '<i class="fas fa-sync fa-spin"></i> Подключение...';
+    connectButton.textContent = 'Подключение...';
 
-    // Инициализируем Socket.IO соединение
+    // Инициализируем Socket.IO соединение (ваш оригинальный код)
     socket = io();
 
     socket.on('connect', () => {
-        showNotification('Подключение к сигнальному серверу установлено', 'success');
+        showNotification('Подключение к сигнальному серверу установлено');
         updateSocketStatus(true);
         connectButton.style.display = 'none';
-        document.getElementById('callControls').style.display = 'flex';
+        document.getElementById('callControls').style.display = 'block';
         
         // Сообщаем серверу о присоединении к комнате
         socket.emit('join', { username, room: roomId });
@@ -172,129 +94,131 @@ function connectToSignalingServer() {
         showNotification('Отключено от сигнального сервера', 'error');
         updateSocketStatus(false);
         connectButton.disabled = false;
-        connectButton.innerHTML = '<i class="fas fa-plug"></i> Переподключиться';
+        connectButton.textContent = 'Подключиться';
         connectButton.style.display = 'block';
     });
 
     socket.on('message', (data) => {
         console.log('Message from server:', data);
-        showNotification(data.message, 'info');
+        showNotification(data.message);
     });
 
     socket.on('error', (error) => {
         console.error('Socket error:', error);
         showNotification(`Ошибка: ${error.message}`, 'error');
         connectButton.disabled = false;
-        connectButton.innerHTML = '<i class="fas fa-plug"></i> Подключиться';
+        connectButton.textContent = 'Подключиться';
     });
+}
+
+// ==================== ОБНОВЛЕНИЕ СТАТУСА ====================
+function updateSocketStatus(connected) {
+    const statusDot = socketStatus;
+    const statusText = statusDot.nextElementSibling;
+    
+    if (connected) {
+        statusDot.className = 'status-dot connected';
+        statusText.textContent = 'Signal: Подключен';
+    } else {
+        statusDot.className = 'status-dot';
+        statusText.textContent = 'Signal: Отключен';
+    }
+}
+
+function updateJanusStatus(connected) {
+    const statusDot = janusStatus;
+    const statusText = statusDot.nextElementSibling;
+    
+    if (connected) {
+        statusDot.className = 'status-dot connected';
+        statusText.textContent = 'Media: Подключен';
+    } else {
+        statusDot.className = 'status-dot';
+        statusText.textContent = 'Media: Отключен';
+    }
 }
 
 // ==================== ИНИЦИАЛИЗАЦИЯ JANUS ====================
 function initializeJanus() {
+    // Проверяем что Janus доступен
     if (typeof Janus === 'undefined') {
         showNotification('Библиотека Janus не загружена', 'error');
         return;
     }
 
-    try {
-        Janus.init({
-            debug: true,
-            dependencies: Janus.useDefaultDependencies(),
-            callback: function() {
-                showNotification('Janus API загружен', 'success');
-                
-                // Создаем сессию
-                janus = new Janus({
-                    server: 'http://localhost:8088/janus',
-                    success: function() {
-                        showNotification('Подключение к медиасерверу установлено', 'success');
-                        updateJanusStatus(true);
-                        session = janus;
-                        attachVideoRoomPlugin();
-                    },
-                    error: function(error) {
-                        console.error('Janus error:', error);
-                        showNotification('Ошибка подключения к медиасерверу: ' + error, 'error');
-                        updateJanusStatus(false);
-                        connectButton.disabled = false;
-                        connectButton.innerHTML = '<i class="fas fa-plug"></i> Подключиться';
-                        connectButton.style.display = 'block';
-                    },
-                    destroyed: function() {
-                        updateJanusStatus(false);
-                    }
-                });
-            }
-        });
-    } catch (error) {
-        console.error('Janus init error:', error);
-        showNotification('Ошибка инициализации Janus: ' + error.message, 'error');
-    }
+    Janus.init({
+        debug: false,
+        dependencies: Janus.useDefaultDependencies(),
+        callback: function() {
+            showNotification('Janus API загружен');
+            
+            // Создаем сессию (ваш оригинальный сервер)
+            janus = new Janus({
+                server: 'http://localhost:8088/janus',
+                success: function() {
+                    showNotification('Подключение к медиасерверу установлено');
+                    updateJanusStatus(true);
+                    session = janus;
+                    attachVideoRoomPlugin();
+                },
+                error: function(error) {
+                    console.error('Janus error:', error);
+                    showNotification('Ошибка подключения к медиасерверу', 'error');
+                    updateJanusStatus(false);
+                },
+                destroyed: function() {
+                    updateJanusStatus(false);
+                }
+            });
+        }
+    });
 }
 
 // ==================== ПОДКЛЮЧЕНИЕ К PLUGIN VIDEOROOM ====================
 function attachVideoRoomPlugin() {
-    if (!session) {
-        showNotification('Сессия не активна', 'error');
-        return;
-    }
-
-    // Генерируем opaqueId
-    opaqueId = "live-lessons-" + Math.random().toString(36).substring(2, 15);
-
     session.attach({
         plugin: "janus.plugin.videoroom",
         opaqueId: opaqueId,
-        success: function(handle) {
-            pluginHandle = handle;
-            showNotification('Плагин видеокомнаты инициализирован', 'success');
+        success: function(pluginHandle) {
+            window.pluginHandle = pluginHandle;
+            showNotification('Плагин видеокомнаты инициализирован');
             
-            // Можно присоединиться к комнате как publisher/listener
+            // Присоединяемся к комнате
             joinVideoRoom();
         },
         error: function(error) {
             console.error('Error attaching plugin:', error);
-            showNotification('Ошибка инициализации плагина: ' + error, 'error');
+            showNotification('Ошибка инициализации плагина', 'error');
         },
         onmessage: function(msg, jsep) {
             console.log('Plugin message:', msg);
             
             if (jsep) {
-                // Обрабатываем JSEP offer/answer
                 pluginHandle.handleRemoteJsep({ jsep: jsep });
             }
             
             if (msg["videoroom"] === "event") {
                 if (msg["started"]) {
-                    showNotification('Трансляция начата', 'success');
+                    showNotification('Трансляция начата');
                     callButton.disabled = true;
                     hangupButton.disabled = false;
                 } else if (msg["leaving"]) {
-                    showNotification('Участник покинул комнату', 'info');
+                    showNotification('Участник покинул комнату');
                 }
             }
         },
         onlocaltrack: function(track, on) {
-            console.log("Local track " + (on ? "added" : "removed"), track);
-            if (!on) {
-                return;
-            }
-            
             if (track.kind === "video") {
                 Janus.attachMediaStream(localVideo, track);
-                updateVideoInfo(localVideo, localVideoInfo, 'Локальное видео');
             }
         },
         onremotetrack: function(track, mid, on) {
-            console.log("Remote track " + (on ? "added" : "removed"), track);
-            
             if (track.kind === "video") {
                 Janus.attachMediaStream(remoteVideo, track);
-                updateVideoInfo(remoteVideo, remoteVideoInfo, 'Удаленное видео');
             }
         },
         oncleanup: function() {
-            showNotification('Медиа соединение закрыто', 'info');
+            showNotification('Медиа соединение закрыто');
         }
     });
 }
@@ -317,8 +241,8 @@ function joinVideoRoom() {
 // ==================== НАЧАТЬ ЗВОНОК / ПУБЛИКАЦИЯ ====================
 async function startCall() {
     try {
-        // Получаем медиапоток с новыми настройками
-        localStream = await navigator.mediaDevices.getUserMedia(currentSettings);
+        // Получаем медиапоток с настройками
+        localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
         
         // Публикуем поток
         pluginHandle.createOffer({
@@ -331,8 +255,6 @@ async function startCall() {
                 videoRecv: true
             },
             success: function(jsep) {
-                console.log("Got SDP offer:", jsep);
-                
                 const publish = {
                     "request": "configure",
                     "audio": audioEnabled,
@@ -349,7 +271,7 @@ async function startCall() {
         
     } catch (error) {
         console.error("Error starting call:", error);
-        showNotification('Ошибка доступа к медиаустройствам: ' + error.message, 'error');
+        showNotification('Ошибка доступа к медиаустройствам', 'error');
     }
 }
 
@@ -368,7 +290,7 @@ function hangupCall() {
         callButton.disabled = false;
         hangupButton.disabled = true;
         
-        showNotification('Звонок завершен', 'info');
+        showNotification('Звонок завершен');
     }
 }
 
@@ -385,7 +307,7 @@ function toggleMedia(type) {
                 audio: audioEnabled
             } 
         });
-        showNotification(`Микрофон ${audioEnabled ? 'включен' : 'выключен'}`, 'info');
+        showNotification(`Микрофон ${audioEnabled ? 'включен' : 'выключен'}`);
         
     } else if (type === 'video') {
         videoEnabled = !videoEnabled;
@@ -396,121 +318,32 @@ function toggleMedia(type) {
                 video: videoEnabled
             } 
         });
-        showNotification(`Камера ${videoEnabled ? 'включена' : 'выключена'}`, 'info');
+        showNotification(`Камера ${videoEnabled ? 'включена' : 'выключена'}`);
     }
 }
 
-// ==================== НАСТРОЙКИ ====================
-function toggleSettingsPanel() {
-    const settingsPanel = document.getElementById('settingsPanel');
-    settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
-}
-
-function updateMediaConstraintsFromUI() {
-    const resolution = videoResolutionSelect.value.split('x');
-    const audioQuality = parseInt(audioQualitySelect.value);
+// ==================== УВЕДОМЛЕНИЯ ====================
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.innerHTML = message;
     
-    // Обновляем настройки видео
-    currentSettings.video = {
-        width: { ideal: parseInt(resolution[0]) },
-        height: { ideal: parseInt(resolution[1]) },
-        frameRate: { ideal: 30, max: 60 },
-        deviceId: videoSourceSelect.value ? { exact: videoSourceSelect.value } : undefined
-    };
-    
-    // Обновляем настройки аудио
-    let audioBitrate = 128000;
-    let sampleRate = 48000;
-    
-    if (audioQuality === 0) {
-        audioBitrate = 64000;
-        sampleRate = 24000;
-    } else if (audioQuality === 2) {
-        audioBitrate = 192000;
-        sampleRate = 48000;
+    if (type === 'error') {
+        notification.style.borderLeftColor = '#ff4757';
+    } else if (type === 'success') {
+        notification.style.borderLeftColor = '#2ed573';
     }
     
-    currentSettings.audio = {
-        channelCount: { ideal: 2 },
-        echoCancellation: true,
-        noiseSuppression: true,
-        sampleRate: sampleRate,
-        bitrate: audioBitrate,
-        deviceId: audioSourceSelect.value ? { exact: audioSourceSelect.value } : undefined
-    };
-}
-
-async function applyNewMediaSettings() {
-    showNotification('Применение новых настроек...', 'info');
+    document.body.appendChild(notification);
     
-    // Если есть активный звонок, перезапускаем его с новыми настройками
-    if (hangupButton.disabled === false) {
-        hangupCall();
-        setTimeout(startCall, 1000);
-    }
-    
-    toggleSettingsPanel();
-}
-
-// ==================== ИНФОРМАЦИЯ О ВИДЕО ====================
-function updateVideoInfo(videoElement, infoElement, prefix) {
-    function updateInfo() {
-        if (videoElement.videoWidth && videoElement.videoHeight) {
-            const fps = videoElement.getVideoPlaybackQuality?.()?.totalVideoFrames || 'N/A';
-            infoElement.textContent = 
-                `${prefix}: ${videoElement.videoWidth}x${videoElement.videoHeight}`;
-        }
-    }
-    
-    // Обновляем информацию периодически
-    updateInfo();
-    setInterval(updateInfo, 3000);
-}
-
-// ==================== ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ ====================
-document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
-});
-
-function initializeApp() {
-    // Проверяем периодически, загрузился ли Janus
-    const checkJanusInterval = setInterval(() => {
-        if (typeof Janus !== 'undefined') {
-            clearInterval(checkJanusInterval);
-            janusLoaded = true;
-            showNotification('Библиотека Janus загружена', 'success');
-            updateJanusStatus(true);
-            populateDeviceSelectors();
-            setupEventListeners();
-        }
-    }, 1000);
-
-    // Таймаут для проверки Janus
     setTimeout(() => {
-        if (!janusLoaded) {
-            showNotification('Не удалось загрузить библиотеку Janus. Проверьте подключение к интернету.', 'error');
-        }
-    }, 10000);
-}
-
-function setupEventListeners() {
-    // Подключение к сигнальному серверу
-    connectButton.addEventListener('click', connectToSignalingServer);
-
-    // Управление звонком
-    callButton.addEventListener('click', startCall);
-    hangupButton.addEventListener('click', hangupCall);
-
-    // Управление медиа
-    toggleAudioButton.addEventListener('click', () => toggleMedia('audio'));
-    toggleVideoButton.addEventListener('click', () => toggleMedia('video'));
-    settingsButton.addEventListener('click', toggleSettingsPanel);
-    applySettingsButton.addEventListener('click', applyNewMediaSettings);
-
-    // Обработка изменений в настройках
-    videoResolutionSelect.addEventListener('change', updateMediaConstraintsFromUI);
-    audioQualitySelect.addEventListener('change', updateMediaConstraintsFromUI);
-
-    // Обработка изменения устройств
-    navigator.mediaDevices.addEventListener('devicechange', populateDeviceSelectors);
+        notification.classList.add('show');
+    }, 100);
+    
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => {
+            notification.remove();
+        }, 300);
+    }, 3000);
 }
