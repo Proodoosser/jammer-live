@@ -1,5 +1,5 @@
 import express from "express";
-import http from "http";
+import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -8,9 +8,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: { origin: "*" },
+});
 
+// Раздаём статику
 app.use(express.static(path.join(__dirname, "public")));
 
 io.on("connection", (socket) => {
@@ -25,7 +28,7 @@ io.on("connection", (socket) => {
   socket.on("offer", ({ to, sdp, room }) => {
     if (to) {
       io.to(to).emit("offer", { from: socket.id, sdp });
-    } else {
+    } else if (room) {
       socket.to(room).emit("offer", { from: socket.id, sdp });
     }
   });
@@ -39,7 +42,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("message", ({ room, user, text }) => {
-    socket.to(room).emit("message", { user, text });
+    io.to(room).emit("message", { user, text });
   });
 
   socket.on("disconnect", () => {
@@ -49,6 +52,6 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log("Server listening on " + PORT);
 });
