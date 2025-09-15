@@ -60,7 +60,7 @@ function addChat(user, text) {
   chatEl.scrollTop = chatEl.scrollHeight;
 }
 
-/* ======= WebRTC & Socket handlers ======= */
+/* ======= WebRTC & Socket ======= */
 async function startLocalMedia() {
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
@@ -100,7 +100,7 @@ function createPeerConnection() {
   };
 }
 
-/* ====== События Socket.IO ====== */
+/* ===== Socket.IO ===== */
 function setupSocket() {
   socket = io(SIGNALING_SERVER);
 
@@ -111,6 +111,7 @@ function setupSocket() {
 
   socket.on("peer-joined", (data) => {
     log("Peer joined: " + JSON.stringify(data));
+    peerSocketId = data.id;
   });
 
   socket.on("offer", async ({ from, sdp }) => {
@@ -151,9 +152,13 @@ function setupSocket() {
       pc = null;
     }
   });
+
+  socket.on("message", ({ user, text }) => {
+    addChat(user, text);
+  });
 }
 
-/* ======= Join / Start logic ======= */
+/* ======= Join ======= */
 joinBtn.onclick = async () => {
   roomId = roomIdInput.value.trim();
   role = roleSelect.value;
@@ -206,7 +211,7 @@ leaveBtn.onclick = () => {
 sendChatBtn.onclick = () => {
   const text = chatInput.value.trim();
   if (!text) return;
-  addChat("You", text);
+  addChat(role, text);
   if (socket) socket.emit("message", { room: roomId, user: role, text });
   chatInput.value = "";
 };
