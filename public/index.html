@@ -1,180 +1,102 @@
-// app.js — Jammer (Telegram style)
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jammer — 1 on 1</title>
 
-const socket = io();
-let pc;
-let localStream;
-let remoteStream;
+<!-- inline small SVG favicon to avoid 404 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='100%25' height='100%25' fill='%230f0f0f'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='10' fill='%23ff5e00'%3EJ%3C/text%3E%3C/svg%3E">
 
-// DOM refs
-const roomInput = document.getElementById("roomId");
-const roleSelect = document.getElementById("roleSelect");
-const joinBtn = document.getElementById("joinBtn");
-const leaveBtn = document.getElementById("leaveBtn");
-const statusEl = document.getElementById("status");
-const chatArea = document.getElementById("chatArea");
-const chatInput = document.getElementById("chatInput");
-const sendChatBtn = document.getElementById("sendChatBtn");
-const localVideo = document.getElementById("localVideo");
-const remoteVideo = document.getElementById("remoteVideo");
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#0b0b0c; --muted:#9aa4ad; --accent:#ff5e00; }
+  body{ margin:0; font-family:Inter,system-ui,Arial; background:var(--bg); color:#eee; }
+  .wrap{ padding:12px; display:flex; gap:12px; height:100vh; box-sizing:border-box; }
+  .left{ flex:1; display:flex; flex-direction:column; gap:12px; min-width:320px; }
+  .right{ width:360px; display:flex; flex-direction:column; gap:12px; }
+  .controls{ display:flex; gap:8px; align-items:center; }
+  input, select, button{ padding:8px; border-radius:8px; background:#121212; border:1px solid #222; color:#eee; }
+  button.btn-main{ background:var(--accent); color:#111; border:none; font-weight:700; }
+  .videos{ display:flex; gap:8px; flex:1; align-items:stretch; }
+  .video-box{ flex:1; background:#000; border-radius:10px; overflow:hidden; position:relative; border:1px solid rgba(255,255,255,0.03); min-height:240px; }
+  video{ width:100%; height:100%; object-fit:cover; display:block; }
+  .mini{ position:absolute; width:160px; height:100px; right:12px; bottom:12px; border-radius:8px; overflow:hidden; border:2px solid rgba(255,255,255,0.06); background:#000; cursor:grab; }
+  .chat{ background:#0f1113; border-radius:10px; padding:12px; display:flex; flex-direction:column; height:calc(100vh - 48px - 24px); }
+  .chat-area{ flex:1; overflow:auto; padding:6px; display:flex; flex-direction:column; gap:8px; }
+  .chat-input{ display:flex; gap:8px; margin-top:8px; }
+  .bubble { padding:8px 10px; border-radius:12px; max-width:80%; }
+  .bubble.teacher{ background:#e8f0ff; color:#04203b; align-self:flex-end; border-bottom-right-radius:4px; }
+  .bubble.student{ background:#e8ffe8; color:#083b08; align-self:flex-start; border-bottom-left-radius:4px; }
+  .bubble.system{ background:transparent; color:var(--muted); font-style:italic; align-self:center; }
+  .small{ font-size:12px; color:var(--muted); }
+  .status{ margin-left:auto; color:var(--muted); }
+  @media (max-width:900px){ .wrap{ flex-direction:column; } .right{ width:100%; height:40vh; } }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="left">
+      <div class="controls">
+        <input id="roomId" placeholder="Room id, например lesson123" value="lesson123" />
+        <select id="roleSelect"><option value="teacher">Teacher</option><option value="student">Student</option></select>
+        <button id="joinBtn" class="btn-main">Join / Start</button>
+        <button id="leaveBtn" disabled>Leave</button>
+        <div class="status small">Status: <span id="status">not connected</span></div>
+        <div class="small" style="margin-left:8px">Socket: <span id="socketId">—</span></div>
+      </div>
 
-// helpers
-function setStatus(txt) {
-  if (statusEl) statusEl.textContent = txt;
-}
+      <div class="videos">
+        <div class="video-box">
+          <video id="remoteVideo" autoplay playsinline></video>
+          <div class="mini" id="miniWrap"><video id="localVideo" autoplay muted playsinline></video></div>
+        </div>
+      </div>
 
-function addChat(user, text) {
-  if (typeof window.addChat === "function") {
-    window.addChat(user, text);
-  } else {
-    const div = document.createElement("div");
-    div.textContent = `${user}: ${text}`;
-    chatArea.appendChild(div);
-    chatArea.scrollTop = chatArea.scrollHeight;
-  }
-}
+      <div style="display:flex; gap:8px;">
+        <button id="swapBtn">Swap view</button>
+        <button id="muteBtn">Mute</button>
+        <button id="camBtn">Cam</button>
+      </div>
+    </div>
 
-// ---- join / leave ----
-async function joinAs(role) {
-  const roomId = roomInput.value.trim();
-  if (!roomId) {
-    alert("Enter room id");
-    return;
-  }
-  setStatus("Connecting…");
-  joinBtn.disabled = true;
+    <div class="right">
+      <div class="chat">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <div><strong>Chat</strong> <span class="small">Jammer</span></div>
+          <div class="small">Room: <span id="showRoom">—</span></div>
+        </div>
 
-  // create peerconnection
-  pc = new RTCPeerConnection({
-    iceServers: [
-      {
-        urls: "turn:global.xirsys.net:3478?transport=udp",
-        username: "Prodoosser",
-        credential: "c673ce8e-920c-11f0-8f21-4662eff0c0a9",
-      },
-      {
-        urls: "turn:global.xirsys.net:3478?transport=tcp",
-        username: "Prodoosser",
-        credential: "c673ce8e-920c-11f0-8f21-4662eff0c0a9",
-      },
-    ],
-    iceTransportPolicy: "relay",
-  });
+        <div id="chatArea" class="chat-area">
+          <!-- messages (bubbles) will be appended here -->
+        </div>
 
-  // remote track
-  remoteStream = new MediaStream();
-  remoteVideo.srcObject = remoteStream;
-  pc.ontrack = (e) => {
-    e.streams[0].getTracks().forEach((t) => remoteStream.addTrack(t));
-  };
+        <div class="chat-input">
+          <input id="chatInput" placeholder="Написать сообщение..." />
+          <button id="sendChatBtn">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  // ICE
-  pc.onicecandidate = (e) => {
-    if (e.candidate) {
-      socket.emit("candidate", { candidate: e.candidate, roomId });
-    }
-  };
+  <script>
+    // small UI helper: bubble-based addChat used by app.js
+    (function(){
+      const chatArea = document.getElementById('chatArea');
+      window.addChat = function(user, text){
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble ' + (user === 'system' ? 'system' : (user === 'teacher' ? 'teacher' : 'student'));
+        bubble.innerHTML = `<div>${text}</div><div class="small" style="margin-top:6px">${new Date().toLocaleTimeString()} • ${user}</div>`;
+        if(user === 'teacher') bubble.style.alignSelf = 'flex-end';
+        else if(user === 'student') bubble.style.alignSelf = 'flex-start';
+        else bubble.style.alignSelf = 'center';
+        chatArea.appendChild(bubble);
+        chatArea.scrollTop = chatArea.scrollHeight;
+      };
+    })();
+  </script>
 
-  // local media
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 2,
-        echoCancellation: true,
-        noiseSuppression: true,
-      },
-      video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-    });
-    localVideo.srcObject = localStream;
-    localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
-  } catch (err) {
-    console.error("getUserMedia error", err);
-    alert("Could not access mic/camera");
-    return;
-  }
-
-  // socket events
-  socket.emit("join", { roomId, role });
-
-  socket.on("offer", async (offer) => {
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    const answer = await pc.createAnswer();
-    preferOpus(answer);
-    await pc.setLocalDescription(answer);
-    socket.emit("answer", { answer, roomId });
-  });
-
-  socket.on("answer", async (answer) => {
-    await pc.setRemoteDescription(new RTCSessionDescription(answer));
-  });
-
-  socket.on("candidate", async (msg) => {
-    try {
-      await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-    } catch (err) {
-      console.error("ICE add error", err);
-    }
-  });
-
-  socket.on("chat", (msg) => {
-    addChat(msg.user, msg.text);
-  });
-
-  setStatus("Connected");
-  leaveBtn.disabled = false;
-}
-
-function leaveRoom() {
-  if (pc) {
-    pc.close();
-    pc = null;
-  }
-  if (socket) {
-    socket.emit("leave", { roomId: roomInput.value });
-  }
-  if (localStream) {
-    localStream.getTracks().forEach((t) => t.stop());
-    localStream = null;
-  }
-  localVideo.srcObject = null;
-  remoteVideo.srcObject = null;
-  setStatus("Disconnected");
-  joinBtn.disabled = false;
-  leaveBtn.disabled = true;
-}
-
-// prefer Opus
-function preferOpus(desc) {
-  if (!desc.sdp) return;
-  const lines = desc.sdp.split("\n");
-  const mLineIndex = lines.findIndex((l) => l.startsWith("m=audio"));
-  if (mLineIndex === -1) return;
-  const opusIdx = lines.findIndex(
-    (l) => l.toLowerCase().includes("opus/48000")
-  );
-  if (opusIdx === -1) return;
-  const opusPayload = lines[opusIdx].match(/:(\d+)/)[1];
-  const mLine = lines[mLineIndex].split(" ");
-  const newLine = [
-    mLine[0],
-    mLine[1],
-    mLine[2],
-    opusPayload,
-    ...mLine.slice(3).filter((x) => x !== opusPayload),
-  ];
-  lines[mLineIndex] = newLine.join(" ");
-  desc.sdp = lines.join("\n");
-}
-
-// ---- wire UI ----
-joinBtn.onclick = () => joinAs(roleSelect.value);
-leaveBtn.onclick = () => leaveRoom();
-
-sendChatBtn.onclick = () => {
-  const text = chatInput.value.trim();
-  if (!text) return;
-  const roomId = roomInput.value.trim();
-  const role = roleSelect.value;
-  addChat(role, text);
-  socket.emit("chat", { roomId, user: role, text });
-  chatInput.value = "";
-};
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
