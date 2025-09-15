@@ -1,37 +1,55 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
+import express from "express";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+const httpServer = createServer(app);
+const io = new Server(httpServer);
 
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
 
 io.on("connection", (socket) => {
-  console.log("client connected");
+  console.log("connected", socket.id);
 
-  socket.on("join", ({ roomId, role }) => {
+  socket.on("join-room", (roomId, role) => {
     socket.join(roomId);
-    socket.to(roomId).emit("chat", { user: "system", text: `${role} joined` });
+    socket.role = role;
+    socket.roomId = roomId;
+    console.log(`${socket.id} joined room ${roomId} as ${role}`);
+
+    socket.to(roomId).emit("peer-joined", { id: socket.id, role });
   });
 
-  socket.on("offer", ({ roomId, sdp }) => {
-    socket.to(roomId).emit("offer", { sdp });
+  socket.on("offer", ({ to, sdp }) => {
+    if (to) io.to(to).emit("offer", { from: socket.id, sdp });
   });
 
-  socket.on("answer", ({ roomId, sdp }) => {
-    socket.to(roomId).emit("answer", { sdp });
+  socket.on("answer", ({ to, sdp }) => {
+    if (to) io.to(to).emit("answer", { from: socket.id, sdp });
   });
 
-  socket.on("ice-candidate", ({ roomId, candidate }) => {
-    socket.to(roomId).emit("ice-candidate", { candidate });
+  socket.on("ice-candidate", ({ to, candidate }) => {
+    if (to) io.to(to).emit("ice-candidate", { from: socket.id, candidate });
   });
 
-  socket.on("chat", ({ roomId, user, text }) => {
-    io.to(roomId).emit("chat", { user, text });
+  socket.on("message", ({ room, user, text }) => {
+    io.to(room).emit("message", { user, text });
+  });
+
+  socket.on("disconnect", () => {
+    console.log("disconnected", socket.id);
+    if (socket.roomId) {
+      socket.to(socket.roomId).emit("peer-left", { id: socket.id });
+    }
   });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log("Server running on", PORT));
+const PORT = process.env.PORT || 10000;
+httpServer.listen(PORT, () => {
+  console.log("Server listening on", PORT);
+});
