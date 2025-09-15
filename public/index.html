@@ -1,44 +1,282 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <title>Jammer Live Chat</title>
-  <style>
-    body { font-family: sans-serif; margin: 20px; }
-    #messages { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; }
-    input { width: 80%; padding: 5px; }
-    button { padding: 5px 10px; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jammer 1-on-1 Live</title>
+<style>
+  body { background:#0f0f0f; color:#fff; font-family: Arial, sans-serif; margin:0; padding:0; }
+  header { padding:12px; background:#111; text-align:center; font-weight:600; }
+  .wrap { display:flex; gap:12px; padding:12px; }
+  .col { flex:1; min-width:300px; }
+  video { width:100%; height:auto; background:#000; border-radius:8px; border:2px solid #222; }
+  #controls { display:flex; gap:8px; margin-top:8px; }
+  input, button, select { padding:8px; border-radius:6px; border:1px solid #333; background:#121212; color:#fff; }
+  #chat { height:200px; overflow:auto; background:#121212; padding:8px; border-radius:6px; margin-top:8px; }
+  .msg { margin-bottom:6px; }
+  .small { font-size:12px; color:#aaa; }
+</style>
 </head>
 <body>
-  <h2>🎸 Jammer Live Chat</h2>
-  <div id="messages"></div>
-  <form id="form">
-    <input id="input" autocomplete="off" />
-    <button>Отправить</button>
-  </form>
+<header>Jammer — 1 on 1 Live (WebRTC)</header>
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io();
-    const form = document.getElementById("form");
-    const input = document.getElementById("input");
-    const messages = document.getElementById("messages");
+<div style="padding:12px;">
+  <div style="display:flex; gap:12px; margin-bottom:12px;">
+    <input id="roomId" placeholder="Room ID, напр. lesson123" value="lesson123" />
+    <select id="roleSelect">
+      <option value="teacher">Teacher</option>
+      <option value="student">Student</option>
+    </select>
+    <button id="joinBtn">Start / Join</button>
+    <button id="leaveBtn" disabled>Leave</button>
+    <span class="small" id="status">not connected</span>
+  </div>
 
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      if (input.value) {
-        socket.emit("chat message", input.value);
-        input.value = "";
+  <div class="wrap">
+    <div class="col">
+      <div>
+        <div style="display:flex; gap:8px;">
+          <div style="flex:1"><b>Local (you)</b></div>
+          <div style="flex:1; text-align:right"><b>Remote (peer)</b></div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <video id="localVideo" autoplay muted playsinline></video>
+          <video id="remoteVideo" autoplay playsinline></video>
+        </div>
+      </div>
+
+      <div id="controls">
+        <button id="muteBtn">Mute</button>
+        <button id="camBtn">Camera Off</button>
+        <button id="screenBtn">Share Screen</button>
+      </div>
+
+      <div id="chat-area" style="margin-top:12px;">
+        <div class="small">Chat (messages are local for now)</div>
+        <div id="chat" ></div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <input id="chatInput" placeholder="Message..." />
+          <button id="sendChatBtn">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col" style="max-width:360px;">
+      <div style="background:#0b0b0b; padding:12px; border-radius:8px;">
+        <h3>Info / Instructions</h3>
+        <ul>
+          <li>1) Введи одинаковый Room ID для вас и ученика.</li>
+          <li>2) Teacher нажимает Start, Student нажимает Join.</li>
+          <li>3) Для лучшего прохождения добавь STUN/TURN (TURN если проблемы с NAT).</li>
+        </ul>
+        <div style="margin-top:8px;">
+          <b>Room:</b> <span id="showRoom">—</span><br/>
+          <b>Your socket:</b> <span id="socketId">—</span>
+        </div>
+      </div>
+
+      <div style="margin-top:12px; background:#0b0b0b; padding:12px; border-radius:8px;">
+        <h4>Debug</h4>
+        <div class="small">Messages from server:</div>
+        <div id="log" style="height:160px; overflow:auto; margin-top:8px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+<script>
+/* ======= Конфигурация ======= */
+const SIGNALING_SERVER = (location.hostname === "localhost" || location.hostname === "127.0.0.1") 
+  ? "http://localhost:3000" 
+  : window.location.origin; // при деплое на Render origin будет правильный
+
+const ICE_CONFIG = { 
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" }
+    // Для TURN: { urls: "turn:turn.example.com:3478", username:"user", credential:"pass" }
+  ]
+};
+
+/* ======= Элементы ======= */
+const localVideo = document.getElementById("localVideo");
+const remoteVideo = document.getElementById("remoteVideo");
+const joinBtn = document.getElementById("joinBtn");
+const leaveBtn = document.getElementById("leaveBtn");
+const roomIdInput = document.getElementById("roomId");
+const roleSelect = document.getElementById("roleSelect");
+const statusSpan = document.getElementById("status");
+const showRoom = document.getElementById("showRoom");
+const socketIdSpan = document.getElementById("socketId");
+const logEl = document.getElementById("log");
+const chatEl = document.getElementById("chat");
+const chatInput = document.getElementById("chatInput");
+const sendChatBtn = document.getElementById("sendChatBtn");
+
+let socket = null;
+let pc = null;
+let localStream = null;
+let remoteStream = null;
+let roomId = null;
+let role = null;
+let peerSocketId = null;
+
+/* ======= Утилиты ======= */
+function log(msg) { 
+  const d = document.createElement("div"); d.textContent = msg; logEl.appendChild(d); logEl.scrollTop = logEl.scrollHeight;
+}
+function addChat(user, text){ const d=document.createElement("div"); d.className="msg"; d.innerHTML=`<b>${user}:</b> ${text}`; chatEl.appendChild(d); chatEl.scrollTop=chatEl.scrollHeight; }
+
+/* ======= WebRTC & Socket handlers ======= */
+async function startLocalMedia() {
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    localVideo.srcObject = localStream;
+  } catch (e) {
+    alert("Ошибка доступа к камере/микрофону: " + e.message);
+    throw e;
+  }
+}
+
+function createPeerConnection() {
+  pc = new RTCPeerConnection(ICE_CONFIG);
+  remoteStream = new MediaStream();
+  remoteVideo.srcObject = remoteStream;
+
+  // локальные треки -> отправляем
+  if (localStream) {
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+  }
+
+  pc.ontrack = (evt) => {
+    evt.streams[0].getTracks().forEach(t => remoteStream.addTrack(t));
+  };
+
+  pc.onicecandidate = (evt) => {
+    if (evt.candidate && peerSocketId) {
+      socket.emit("ice-candidate", { to: peerSocketId, candidate: evt.candidate });
+      log("Sent ICE candidate to " + peerSocketId);
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    log("PC state: " + pc.connectionState);
+    statusSpan.textContent = pc.connectionState;
+  };
+}
+
+/* ====== События Socket.IO ====== */
+function setupSocket() {
+  socket = io(SIGNALING_SERVER);
+  socket.on("connect", () => {
+    socketIdSpan.textContent = socket.id;
+    log("Connected to signaling server: " + socket.id);
+  });
+
+  socket.on("peer-joined", (data) => {
+    log("Peer joined: " + JSON.stringify(data));
+    // сохраняем id пира (последний в комнате)
+  });
+
+  socket.on("offer", async ({ from, sdp }) => {
+    log("Received offer from " + from);
+    peerSocketId = from;
+    if (!pc) createPeerConnection();
+    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    socket.emit("answer", { to: from, sdp: pc.localDescription });
+    log("Sent answer to " + from);
+  });
+
+  socket.on("answer", async ({ from, sdp }) => {
+    log("Received answer from " + from);
+    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+  });
+
+  socket.on("ice-candidate", async ({ from, candidate }) => {
+    log("Received ICE from " + from);
+    try { await pc.addIceCandidate(candidate); } catch (e) { console.warn(e); }
+  });
+
+  socket.on("peer-left", ({ id }) => {
+    log("Peer left: " + id);
+    addChat("system", "Партнёр отключился");
+    // очистить remote
+    if (remoteStream) { remoteStream.getTracks().forEach(t => t.stop()); remoteStream = null; remoteVideo.srcObject = null; }
+    if (pc) { pc.close(); pc = null; }
+  });
+}
+
+/* ======= Join / Start logic ======= */
+joinBtn.onclick = async () => {
+  roomId = roomIdInput.value.trim();
+  role = roleSelect.value;
+  if (!roomId) return alert("Укажи Room ID");
+
+  showRoom.textContent = roomId;
+  statusSpan.textContent = "connecting...";
+  joinBtn.disabled = true;
+  leaveBtn.disabled = false;
+
+  setupSocket();
+  await startLocalMedia();
+  createPeerConnection();
+
+  // join room on server
+  socket.emit("join-room", roomId, role);
+  log("Joined room " + roomId + " as " + role);
+
+  // если teacher — создаём offer и посылаем его всем в комнате (бродкаст)
+  socket.on("connect", async () => {
+    // small delay to ensure server processed join
+    setTimeout(async () => {
+      if (role === "teacher") {
+        // find peer(s) in room: we will assume student will reply with offer? 
+        // Простейшая логика: teacher делает offer, student ответит.
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit("offer", { to: null, sdp: pc.localDescription, room: roomId });
+        log("Teacher: created offer and emitted (broadcast)");
       }
-    });
+    }, 500);
+  });
 
-    socket.on("chat message", (msg) => {
-      const item = document.createElement("div");
-      item.textContent = msg;
-      messages.appendChild(item);
-      messages.scrollTop = messages.scrollHeight;
-    });
-  </script>
+  // NOTE: on server we currently expect payload.to to be specific socket id.
+  // To support broadcasting, server can relay offers to room. Simpler approach:
+  // When teacher emits with to=null, server should broadcast to room except sender.
+};
+
+/* ====== Leave ====== */
+leaveBtn.onclick = () => {
+  if (socket) socket.disconnect();
+  if (pc) { pc.close(); pc = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  remoteVideo.srcObject = null;
+  localVideo.srcObject = null;
+  joinBtn.disabled = false;
+  leaveBtn.disabled = true;
+  statusSpan.textContent = "not connected";
+  log("Left room");
+};
+
+/* ===== Chat ====== */
+sendChatBtn.onclick = () => {
+  const text = chatInput.value.trim(); if (!text) return;
+  addChat("You", text);
+  // локально + можно отправить через socket.emit("message", ...)
+  if (socket) socket.emit("message", { room: roomId, user: role, text });
+  chatInput.value = "";
+};
+
+/* ===== Optional: handle simple room-message relay (server doesn't implement message yet) ===== */
+if (typeof io !== "undefined") {
+  // receive generic messages if server emits 'message'
+  // server currently emits only offer/answer/ice; you may add message handling on server for chat.
+  // Example handler:
+  // socket.on("message", (m)=> addChat(m.user, m.text));
+}
+
+</script>
 </body>
 </html>
