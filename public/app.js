@@ -1,7 +1,7 @@
 // Главные переменные
 let socket = null;
 let janus = null;
-let opaqueId = "live-lessons-"+Janus.randomString(12);
+let opaqueId = null;
 let session = null;
 let pluginHandle = null;
 
@@ -53,33 +53,6 @@ let mediaConstraints = {
 };
 let currentSettings = { ...mediaConstraints };
 
-// Инициализация
-document.addEventListener('DOMContentLoaded', function() {
-    updateStatusDisplays();
-    populateDeviceSelectors();
-    setupEventListeners();
-});
-
-// ==================== СЕТУП ЛИСЕНЕРОВ ====================
-function setupEventListeners() {
-    // Подключение к сигнальному серверу
-    connectButton.addEventListener('click', connectToSignalingServer);
-
-    // Управление звонком
-    callButton.addEventListener('click', startCall);
-    hangupButton.addEventListener('click', hangupCall);
-
-    // Управление медиа
-    toggleAudioButton.addEventListener('click', () => toggleMedia('audio'));
-    toggleVideoButton.addEventListener('click', () => toggleMedia('video'));
-    settingsButton.addEventListener('click', toggleSettingsPanel);
-    applySettingsButton.addEventListener('click', applyNewMediaSettings);
-
-    // Обработка изменений в настройках
-    videoResolutionSelect.addEventListener('change', updateMediaConstraintsFromUI);
-    audioQualitySelect.addEventListener('change', updateMediaConstraintsFromUI);
-}
-
 // ==================== УВЕДОМЛЕНИЯ ====================
 function showNotification(message, type = 'info', duration = 5000) {
     const notificationArea = document.getElementById('notificationArea');
@@ -108,10 +81,6 @@ function showNotification(message, type = 'info', duration = 5000) {
 }
 
 // ==================== ОБНОВЛЕНИЕ СТАТУСА ====================
-function updateStatusDisplays() {
-    // Эта функция будет вызываться при изменении состояния соединений
-}
-
 function updateSocketStatus(connected) {
     const dot = socketStatus.querySelector('.status-dot');
     const text = socketStatus.querySelector('span:last-child');
@@ -139,6 +108,9 @@ function updateJanusStatus(connected) {
 // ==================== УПРАВЛЕНИЕ УСТРОЙСТВАМИ ====================
 async function populateDeviceSelectors() {
     try {
+        // Сначала запрашиваем разрешение на доступ к устройствам
+        await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        
         const devices = await navigator.mediaDevices.enumerateDevices();
         
         // Очищаем селекты
@@ -232,6 +204,9 @@ function initializeJanus() {
                     console.error('Janus error:', error);
                     showNotification('Ошибка подключения к медиасерверу', 'error');
                     updateJanusStatus(false);
+                    connectButton.disabled = false;
+                    connectButton.innerHTML = '<i class="fas fa-plug"></i> Подключиться';
+                    connectButton.style.display = 'block';
                 },
                 destroyed: function() {
                     updateJanusStatus(false);
@@ -248,11 +223,14 @@ function attachVideoRoomPlugin() {
         return;
     }
 
+    // Генерируем opaqueId только когда Janus доступен
+    opaqueId = "live-lessons-" + Math.random().toString(36).substring(2, 15);
+
     session.attach({
         plugin: "janus.plugin.videoroom",
         opaqueId: opaqueId,
-        success: function(pluginHandle) {
-            window.pluginHandle = pluginHandle;
+        success: function(handle) {
+            pluginHandle = handle;
             showNotification('Плагин видеокомнаты инициализирован', 'success');
             
             // Можно присоединиться к комнате как publisher/listener
@@ -301,7 +279,6 @@ function attachVideoRoomPlugin() {
         },
         oncleanup: function() {
             showNotification('Медиа соединение закрыто', 'info');
-            Janus.log("Cleanup done");
         }
     });
 }
@@ -474,5 +451,46 @@ function updateVideoInfo(videoElement, infoElement, prefix) {
     setInterval(updateInfo, 3000);
 }
 
-// Обработка изменения устройств
-navigator.mediaDevices.addEventListener('devicechange', populateDeviceSelectors);
+// ==================== ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ ====================
+document.addEventListener('DOMContentLoaded', function() {
+    // Ждем загрузки Janus перед инициализацией
+    if (typeof Janus === 'undefined') {
+        // Если Janus еще не загружен, ждем события
+        window.addEventListener('load', initializeApp);
+    } else {
+        initializeApp();
+    }
+});
+
+function initializeApp() {
+    // Проверяем, что Janus доступен
+    if (typeof Janus === 'undefined') {
+        showNotification('Ошибка: Библиотека Janus не загружена', 'error');
+        return;
+    }
+
+    populateDeviceSelectors();
+    setupEventListeners();
+}
+
+function setupEventListeners() {
+    // Подключение к сигнальному серверу
+    connectButton.addEventListener('click', connectToSignalingServer);
+
+    // Управление звонком
+    callButton.addEventListener('click', startCall);
+    hangupButton.addEventListener('click', hangupCall);
+
+    // Управление медиа
+    toggleAudioButton.addEventListener('click', () => toggleMedia('audio'));
+    toggleVideoButton.addEventListener('click', () => toggleMedia('video'));
+    settingsButton.addEventListener('click', toggleSettingsPanel);
+    applySettingsButton.addEventListener('click', applyNewMediaSettings);
+
+    // Обработка изменений в настройках
+    videoResolutionSelect.addEventListener('change', updateMediaConstraintsFromUI);
+    audioQualitySelect.addEventListener('change', updateMediaConstraintsFromUI);
+
+    // Обработка изменения устройств
+    navigator.mediaDevices.addEventListener('devicechange', populateDeviceSelectors);
+}
