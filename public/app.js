@@ -1,349 +1,217 @@
-// Главные переменные (сохранены ваши оригинальные)
-let socket = null;
-let janus = null;
-let opaqueId = "live-lessons-"+Math.random().toString(36).substring(2, 15);
-let session = null;
-let pluginHandle = null;
+/* ======= Конфигурация ======= */
+const SIGNALING_SERVER =
+  location.hostname === "localhost" || location.hostname === "127.0.0.1"
+    ? "http://localhost:3000"
+    : window.location.origin;
 
-// Элементы DOM
-const localVideo = document.getElementById('localVideo');
-const remoteVideo = document.getElementById('remoteVideo');
-
-// Кнопки и инпуты
-const connectButton = document.getElementById('connectButton');
-const callButton = document.getElementById('callButton');
-const hangupButton = document.getElementById('hangupButton');
-const toggleAudioButton = document.getElementById('toggleAudio');
-const toggleVideoButton = document.getElementById('toggleVideo');
-
-const usernameInput = document.getElementById('usernameInput');
-const roomIdInput = document.getElementById('roomIdInput');
-
-// Элементы статуса
-const socketStatus = document.getElementById('socketStatus');
-const janusStatus = document.getElementById('janusStatus');
-
-// Состояние приложения
-let localStream = null;
-let audioEnabled = true;
-let videoEnabled = true;
-
-// Ваши оригинальные медиа constraints
-const mediaConstraints = {
-    audio: {
-        channelCount: { ideal: 2 },
-        echoCancellation: true,
-        noiseSuppression: true,
-        sampleRate: 48000,
-        bitrate: 128000
+// Xirsys ICE (лучше обновлять динамически, пока — статический)
+const ICE_CONFIG = {
+  iceServers: [
+    {
+      urls: [
+        "stun:fr-turn3.xirsys.com",
+        "turn:fr-turn3.xirsys.com:80?transport=udp",
+        "turn:fr-turn3.xirsys.com:3478?transport=udp",
+        "turn:fr-turn3.xirsys.com:80?transport=tcp",
+        "turn:fr-turn3.xirsys.com:3478?transport=tcp",
+        "turns:fr-turn3.xirsys.com:443?transport=tcp",
+        "turns:fr-turn3.xirsys.com:5349?transport=tcp"
+      ],
+      username:
+        "B0UKGM_7iTKBEwxa1dB6bNj18YKk4Vm-Fo7a3ddF4G8gshE2GgC_0tLJnF8DGtPnAAAAAGjHzn1Qcm9kb29zc2Vy",
+      credential: "24cbbacc-920e-11f0-82f1-e25abca605ee",
     },
-    video: {
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        frameRate: { ideal: 30, max: 60 }
-    }
+  ],
 };
 
-// ==================== ИНИЦИАЛИЗАЦИЯ ====================
-document.addEventListener('DOMContentLoaded', function() {
-    setupEventListeners();
-});
+/* ======= Элементы ======= */
+const localVideo = document.getElementById("localVideo");
+const remoteVideo = document.getElementById("remoteVideo");
+const joinBtn = document.getElementById("joinBtn");
+const leaveBtn = document.getElementById("leaveBtn");
+const roomIdInput = document.getElementById("roomId");
+const roleSelect = document.getElementById("roleSelect");
+const statusSpan = document.getElementById("status");
+const showRoom = document.getElementById("showRoom");
+const socketIdSpan = document.getElementById("socketId");
+const logEl = document.getElementById("log");
+const chatEl = document.getElementById("chat");
+const chatInput = document.getElementById("chatInput");
+const sendChatBtn = document.getElementById("sendChatBtn");
 
-// ==================== НАСТРОЙКА СЛУШАТЕЛЕЙ СОБЫТИЙ ====================
-function setupEventListeners() {
-    // Подключение к сигнальному серверу
-    connectButton.addEventListener('click', connectToSignalingServer);
+let socket = null;
+let pc = null;
+let localStream = null;
+let roomId = null;
+let role = null;
+let peerSocketId = null;
 
-    // Управление звонком
-    callButton.addEventListener('click', startCall);
-    hangupButton.addEventListener('click', hangupCall);
-
-    // Управление медиа
-    toggleAudioButton.addEventListener('click', () => toggleMedia('audio'));
-    toggleVideoButton.addEventListener('click', () => toggleMedia('video'));
+/* ======= Утилиты ======= */
+function log(msg) {
+  const d = document.createElement("div");
+  d.textContent = msg;
+  logEl.appendChild(d);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function addChat(user, text) {
+  const d = document.createElement("div");
+  d.className = "msg";
+  d.innerHTML = `<b>${user}:</b> ${text}`;
+  chatEl.appendChild(d);
+  chatEl.scrollTop = chatEl.scrollHeight;
 }
 
-// ==================== ПОДКЛЮЧЕНИЕ К СИГНАЛЬНОМУ СЕРВЕРУ ====================
-function connectToSignalingServer() {
-    const username = usernameInput.value.trim();
-    const roomId = roomIdInput.value.trim();
-
-    if (!username || !roomId) {
-        showNotification('Введите имя и ID комнаты', 'error');
-        return;
-    }
-
-    connectButton.disabled = true;
-    connectButton.textContent = 'Подключение...';
-
-    // Инициализируем Socket.IO соединение (ваш оригинальный код)
-    socket = io();
-
-    socket.on('connect', () => {
-        showNotification('Подключение к сигнальному серверу установлено');
-        updateSocketStatus(true);
-        connectButton.style.display = 'none';
-        document.getElementById('callControls').style.display = 'block';
-        
-        // Сообщаем серверу о присоединении к комнате
-        socket.emit('join', { username, room: roomId });
-        initializeJanus();
+/* ======= WebRTC ======= */
+async function startLocalMedia() {
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true,
     });
-
-    socket.on('disconnect', () => {
-        showNotification('Отключено от сигнального сервера', 'error');
-        updateSocketStatus(false);
-        connectButton.disabled = false;
-        connectButton.textContent = 'Подключиться';
-        connectButton.style.display = 'block';
-    });
-
-    socket.on('message', (data) => {
-        console.log('Message from server:', data);
-        showNotification(data.message);
-    });
-
-    socket.on('error', (error) => {
-        console.error('Socket error:', error);
-        showNotification(`Ошибка: ${error.message}`, 'error');
-        connectButton.disabled = false;
-        connectButton.textContent = 'Подключиться';
-    });
+    localVideo.srcObject = localStream;
+  } catch (e) {
+    alert("Ошибка доступа к камере/микрофону: " + e.message);
+    throw e;
+  }
 }
 
-// ==================== ОБНОВЛЕНИЕ СТАТУСА ====================
-function updateSocketStatus(connected) {
-    const statusDot = socketStatus;
-    const statusText = statusDot.nextElementSibling;
-    
-    if (connected) {
-        statusDot.className = 'status-dot connected';
-        statusText.textContent = 'Signal: Подключен';
-    } else {
-        statusDot.className = 'status-dot';
-        statusText.textContent = 'Signal: Отключен';
+function createPeerConnection() {
+  pc = new RTCPeerConnection(ICE_CONFIG);
+
+  if (localStream) {
+    localStream.getTracks().forEach((track) =>
+      pc.addTrack(track, localStream)
+    );
+  }
+
+  pc.ontrack = (evt) => {
+    log("Got remote stream");
+    remoteVideo.srcObject = evt.streams[0];
+  };
+
+  pc.onicecandidate = (evt) => {
+    if (evt.candidate && peerSocketId) {
+      socket.emit("ice-candidate", { to: peerSocketId, candidate: evt.candidate });
+      log("Sent ICE candidate to " + peerSocketId);
     }
+  };
+
+  pc.onconnectionstatechange = () => {
+    statusSpan.textContent = pc.connectionState;
+    log("PC state: " + pc.connectionState);
+  };
 }
 
-function updateJanusStatus(connected) {
-    const statusDot = janusStatus;
-    const statusText = statusDot.nextElementSibling;
-    
-    if (connected) {
-        statusDot.className = 'status-dot connected';
-        statusText.textContent = 'Media: Подключен';
-    } else {
-        statusDot.className = 'status-dot';
-        statusText.textContent = 'Media: Отключен';
+async function makeOffer() {
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  socket.emit("offer", { to: peerSocketId, sdp: pc.localDescription });
+  log("Sent offer to " + peerSocketId);
+}
+
+/* ======= Socket ======= */
+function setupSocket() {
+  socket = io(SIGNALING_SERVER);
+
+  socket.on("connect", () => {
+    socketIdSpan.textContent = socket.id;
+    log("Connected to signaling server: " + socket.id);
+    socket.emit("join-room", roomId, role);
+  });
+
+  socket.on("peer-joined", ({ id, role: r }) => {
+    log("Peer joined: " + JSON.stringify({ id, role: r }));
+    // Только teacher ↔ student
+    if (role !== r) {
+      peerSocketId = id;
+      if (role === "teacher") {
+        makeOffer();
+      }
     }
-}
+  });
 
-// ==================== ИНИЦИАЛИЗАЦИЯ JANUS ====================
-function initializeJanus() {
-    // Проверяем что Janus доступен
-    if (typeof Janus === 'undefined') {
-        showNotification('Библиотека Janus не загружена', 'error');
-        return;
+  socket.on("offer", async ({ from, sdp }) => {
+    if (role === "student") {
+      log("Received offer from " + from);
+      peerSocketId = from;
+      if (!pc) createPeerConnection();
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit("answer", { to: from, sdp: pc.localDescription });
+      log("Sent answer to " + from);
     }
+  });
 
-    Janus.init({
-        debug: false,
-        dependencies: Janus.useDefaultDependencies(),
-        callback: function() {
-            showNotification('Janus API загружен');
-            
-            // Создаем сессию (ваш оригинальный сервер)
-            janus = new Janus({
-                server: 'http://localhost:8088/janus',
-                success: function() {
-                    showNotification('Подключение к медиасерверу установлено');
-                    updateJanusStatus(true);
-                    session = janus;
-                    attachVideoRoomPlugin();
-                },
-                error: function(error) {
-                    console.error('Janus error:', error);
-                    showNotification('Ошибка подключения к медиасерверу', 'error');
-                    updateJanusStatus(false);
-                },
-                destroyed: function() {
-                    updateJanusStatus(false);
-                }
-            });
-        }
-    });
-}
+  socket.on("answer", async ({ from, sdp }) => {
+    log("Received answer from " + from);
+    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+  });
 
-// ==================== ПОДКЛЮЧЕНИЕ К PLUGIN VIDEOROOM ====================
-function attachVideoRoomPlugin() {
-    session.attach({
-        plugin: "janus.plugin.videoroom",
-        opaqueId: opaqueId,
-        success: function(pluginHandle) {
-            window.pluginHandle = pluginHandle;
-            showNotification('Плагин видеокомнаты инициализирован');
-            
-            // Присоединяемся к комнате
-            joinVideoRoom();
-        },
-        error: function(error) {
-            console.error('Error attaching plugin:', error);
-            showNotification('Ошибка инициализации плагина', 'error');
-        },
-        onmessage: function(msg, jsep) {
-            console.log('Plugin message:', msg);
-            
-            if (jsep) {
-                pluginHandle.handleRemoteJsep({ jsep: jsep });
-            }
-            
-            if (msg["videoroom"] === "event") {
-                if (msg["started"]) {
-                    showNotification('Трансляция начата');
-                    callButton.disabled = true;
-                    hangupButton.disabled = false;
-                } else if (msg["leaving"]) {
-                    showNotification('Участник покинул комнату');
-                }
-            }
-        },
-        onlocaltrack: function(track, on) {
-            if (track.kind === "video") {
-                Janus.attachMediaStream(localVideo, track);
-            }
-        },
-        onremotetrack: function(track, mid, on) {
-            if (track.kind === "video") {
-                Janus.attachMediaStream(remoteVideo, track);
-            }
-        },
-        oncleanup: function() {
-            showNotification('Медиа соединение закрыто');
-        }
-    });
-}
-
-// ==================== ПРИСОЕДИНЕНИЕ К ВИДЕОКОМНАТЕ ====================
-function joinVideoRoom() {
-    const roomId = parseInt(roomIdInput.value);
-    const username = usernameInput.value;
-    
-    const register = {
-        "request": "join",
-        "room": roomId,
-        "ptype": "publisher",
-        "display": username
-    };
-    
-    pluginHandle.send({ "message": register });
-}
-
-// ==================== НАЧАТЬ ЗВОНОК / ПУБЛИКАЦИЯ ====================
-async function startCall() {
-    try {
-        // Получаем медиапоток с настройками
-        localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-        
-        // Публикуем поток
-        pluginHandle.createOffer({
-            media: {
-                audio: true,
-                video: true,
-                audioSend: audioEnabled,
-                videoSend: videoEnabled,
-                audioRecv: true,
-                videoRecv: true
-            },
-            success: function(jsep) {
-                const publish = {
-                    "request": "configure",
-                    "audio": audioEnabled,
-                    "video": videoEnabled
-                };
-                
-                pluginHandle.send({ "message": publish, "jsep": jsep });
-            },
-            error: function(error) {
-                console.error("Error creating offer:", error);
-                showNotification('Ошибка создания предложения WebRTC', 'error');
-            }
-        });
-        
-    } catch (error) {
-        console.error("Error starting call:", error);
-        showNotification('Ошибка доступа к медиаустройствам', 'error');
+  socket.on("ice-candidate", async ({ from, candidate }) => {
+    if (pc) {
+      try {
+        await pc.addIceCandidate(candidate);
+        log("Added ICE candidate from " + from);
+      } catch (e) {
+        console.warn("Error adding candidate", e);
+      }
     }
+  });
+
+  socket.on("peer-left", ({ id }) => {
+    log("Peer left: " + id);
+    addChat("system", "Партнёр отключился");
+    if (pc) {
+      pc.close();
+      pc = null;
+    }
+    remoteVideo.srcObject = null;
+  });
+
+  socket.on("message", ({ user, text }) => {
+    addChat(user, text);
+  });
 }
 
-// ==================== ЗАВЕРШИТЬ ЗВОНОК ====================
-function hangupCall() {
-    if (pluginHandle) {
-        const unpublish = { "request": "unpublish" };
-        pluginHandle.send({ "message": unpublish });
-        
-        // Отключаем локальные треки
-        if (localStream) {
-            localStream.getTracks().forEach(track => track.stop());
-            localStream = null;
-        }
-        
-        callButton.disabled = false;
-        hangupButton.disabled = true;
-        
-        showNotification('Звонок завершен');
-    }
-}
+/* ======= Join / Leave ======= */
+joinBtn.onclick = async () => {
+  roomId = roomIdInput.value.trim();
+  role = roleSelect.value;
+  if (!roomId) return alert("Укажи Room ID");
 
-// ==================== УПРАВЛЕНИЕ МЕДИА ====================
-function toggleMedia(type) {
-    if (!pluginHandle) return;
-    
-    if (type === 'audio') {
-        audioEnabled = !audioEnabled;
-        toggleAudioButton.classList.toggle('active', audioEnabled);
-        pluginHandle.send({ 
-            message: { 
-                request: "configure",
-                audio: audioEnabled
-            } 
-        });
-        showNotification(`Микрофон ${audioEnabled ? 'включен' : 'выключен'}`);
-        
-    } else if (type === 'video') {
-        videoEnabled = !videoEnabled;
-        toggleVideoButton.classList.toggle('active', videoEnabled);
-        pluginHandle.send({ 
-            message: { 
-                request: "configure",
-                video: videoEnabled
-            } 
-        });
-        showNotification(`Камера ${videoEnabled ? 'включена' : 'выключена'}`);
-    }
-}
+  showRoom.textContent = roomId;
+  statusSpan.textContent = "connecting...";
+  joinBtn.disabled = true;
+  leaveBtn.disabled = false;
 
-// ==================== УВЕДОМЛЕНИЯ ====================
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.className = 'notification';
-    notification.innerHTML = message;
-    
-    if (type === 'error') {
-        notification.style.borderLeftColor = '#ff4757';
-    } else if (type === 'success') {
-        notification.style.borderLeftColor = '#2ed573';
-    }
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.classList.add('show');
-    }, 100);
-    
-    setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => {
-            notification.remove();
-        }, 300);
-    }, 3000);
-}
+  await startLocalMedia();
+  createPeerConnection();
+  setupSocket();
+};
+
+leaveBtn.onclick = () => {
+  if (socket) socket.disconnect();
+  if (pc) {
+    pc.close();
+    pc = null;
+  }
+  if (localStream) {
+    localStream.getTracks().forEach((t) => t.stop());
+    localStream = null;
+  }
+  remoteVideo.srcObject = null;
+  localVideo.srcObject = null;
+  joinBtn.disabled = false;
+  leaveBtn.disabled = true;
+  statusSpan.textContent = "not connected";
+  log("Left room");
+};
+
+/* ===== Chat ===== */
+sendChatBtn.onclick = () => {
+  const text = chatInput.value.trim();
+  if (!text) return;
+  if (socket) socket.emit("message", { room: roomId, user: role, text });
+  chatInput.value = "";
+};
