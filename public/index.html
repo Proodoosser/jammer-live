@@ -5,15 +5,348 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Jammer Live</title>
   <style>
-    body { font-family: sans-serif; padding: 1em; background: #111; color: #eee; }
-    video { width: 45%; background: #000; margin: 0.5em; border: 2px solid #444; }
-    #controls { margin: 1em 0; }
-    #chat { border: 1px solid #444; height: 150px; overflow-y: auto; padding: 5px; margin-top: 1em; background: #222; }
-    .msg { margin: 2px 0; }
-    #log { font-size: 0.8em; background: #222; padding: 5px; margin-top: 1em; height: 100px; overflow-y: auto; }
+    /* === ОСНОВНЫЕ СТИЛИ TELEGRAM === */
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      padding: 1em; 
+      background: var(--tg-theme-bg-color, #18222d); 
+      color: var(--tg-theme-text-color, #ffffff);
+      margin: 0;
+      overflow-x: hidden;
+      cursor: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iNCIgZmlsbD0iIzM3YWVlMiIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+'), auto;
+    }
+    
+    /* === КОСМИЧЕСКАЯ ТЕМА И ПИКСЕЛЬ-АРТ === */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+        radial-gradient(circle at 20% 30%, rgba(55, 174, 226, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(32, 139, 212, 0.1) 0%, transparent 50%),
+        linear-gradient(45deg, #0a0a2a 0%, #1a1a3a 100%);
+      z-index: -2;
+      pointer-events: none;
+    }
+    
+    /* Пиксельная сетка */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: 
+        linear-gradient(rgba(55, 174, 226, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(55, 174, 226, 0.05) 1px, transparent 1px);
+      background-size: 20px 20px;
+      z-index: -1;
+      pointer-events: none;
+    }
+    
+    /* Звезды */
+    .stars {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1;
+    }
+    
+    .star {
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+      animation: twinkle 3s infinite ease-in-out;
+    }
+    
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+    
+    /* === ЭЛЕМЕНТЫ ИНТЕРФЕЙСА === */
+    h1 {
+      text-align: center;
+      color: var(--tg-theme-text-color, #ffffff);
+      margin-bottom: 1rem;
+      font-size: 1.8em;
+      text-shadow: 0 0 10px rgba(55, 174, 226, 0.5);
+      position: relative;
+    }
+    
+    h1::after {
+      content: '🚀';
+      position: absolute;
+      right: 20%;
+      animation: float 3s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-5px); }
+    }
+    
+    /* Контролы */
+    #controls {
+      margin: 1em 0;
+      padding: 1rem;
+      background: var(--tg-theme-secondary-bg-color, #1f2d3b);
+      border-radius: 12px;
+      border: 1px solid var(--tg-theme-hint-color, #2f3e4e);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    #controls::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #37aee2, transparent);
+      animation: scanLine 2s linear infinite;
+    }
+    
+    @keyframes scanLine {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+    
+    label {
+      display: block;
+      margin: 0.5rem 0;
+      color: var(--tg-theme-hint-color, #8e9aa3);
+      font-size: 0.9em;
+    }
+    
+    input, select {
+      width: 100%;
+      padding: 0.8rem;
+      margin: 0.3rem 0;
+      background: var(--tg-theme-bg-color, #18222d);
+      border: 1px solid var(--tg-theme-hint-color, #2f3e4e);
+      border-radius: 8px;
+      color: var(--tg-theme-text-color, #ffffff);
+      font-family: inherit;
+    }
+    
+    /* Кнопки в стиле пиксель-арт */
+    button {
+      background: var(--tg-theme-button-color, #37aee2);
+      color: var(--tg-theme-button-text-color, #ffffff);
+      border: none;
+      padding: 0.8rem 1.5rem;
+      margin: 0.3rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 500;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+    }
+    
+    button:active {
+      transform: translateY(0px);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+    
+    button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s;
+    }
+    
+    button:hover::before {
+      left: 100%;
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    
+    /* Видео контейнеры */
+    div:has(video) {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin: 1rem 0;
+      justify-content: center;
+    }
+    
+    video {
+      width: 45%;
+      background: #000;
+      border: 2px solid var(--tg-theme-hint-color, #2f3e4e);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      transition: all 0.3s ease;
+    }
+    
+    video:hover {
+      border-color: #37aee2;
+      box-shadow: 0 6px 16px rgba(55, 174, 226, 0.3);
+    }
+    
+    /* Статус бар */
+    div:has(#status) {
+      background: var(--tg-theme-secondary-bg-color, #1f2d3b);
+      padding: 0.8rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+      font-size: 0.9em;
+      border: 1px solid var(--tg-theme-hint-color, #2f3e4e);
+    }
+    
+    /* === ВЫДВИЖНОЙ ЧАТ === */
+    #chat {
+      border: 1px solid var(--tg-theme-hint-color, #2f3e4e);
+      height: 150px;
+      overflow-y: auto;
+      padding: 5px;
+      margin-top: 1em;
+      background: var(--tg-theme-secondary-bg-color, #1f2d3b);
+      border-radius: 12px;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+    
+    #chat:hover {
+      height: 250px;
+    }
+    
+    #chat::after {
+      content: '⬆️ Наведите для увеличения';
+      position: absolute;
+      bottom: 5px;
+      right: 5px;
+      font-size: 0.7em;
+      color: var(--tg-theme-hint-color, #8e9aa3);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    #chat:hover::after {
+      opacity: 1;
+    }
+    
+    .msg {
+      margin: 2px 0;
+      padding: 0.5rem;
+      border-radius: 8px;
+      background: var(--tg-theme-bg-color, #18222d);
+      font-size: 0.9em;
+    }
+    
+    /* Ввод сообщения */
+    #chatInput {
+      margin-top: 0.5rem;
+      background: var(--tg-theme-bg-color, #18222d);
+      border: 1px solid var(--tg-theme-hint-color, #2f3e4e);
+      color: var(--tg-theme-text-color, #ffffff);
+    }
+    
+    /* Лог */
+    #log {
+      font-size: 0.8em;
+      background: var(--tg-theme-secondary-bg-color, #1f2d3b);
+      padding: 5px;
+      margin-top: 1em;
+      height: 100px;
+      overflow-y: auto;
+      border-radius: 8px;
+      border: 1px solid var(--tg-theme-hint-color, #2f3e4e);
+    }
+    
+    /* === ДЕКОРАТИВНЫЕ ЭЛЕМЕНТЫ === */
+    .cosmic-element {
+      position: fixed;
+      pointer-events: none;
+      z-index: -1;
+    }
+    
+    .planet {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #37aee2, #1e96c8);
+      box-shadow: 0 0 30px rgba(55, 174, 226, 0.3);
+      top: 10%;
+      right: 5%;
+      opacity: 0.1;
+    }
+    
+    .satellite {
+      width: 30px;
+      height: 30px;
+      background: #37aee2;
+      border-radius: 50%;
+      animation: orbit 20s linear infinite;
+      box-shadow: 0 0 10px rgba(55, 174, 226, 0.5);
+    }
+    
+    @keyframes orbit {
+      0% { transform: rotate(0deg) translateX(100px) rotate(0deg); }
+      100% { transform: rotate(360deg) translateX(100px) rotate(-360deg); }
+    }
+    
+    /* Анимированные кнопки */
+    .pixel-btn {
+      image-rendering: pixelated;
+      border: 2px solid #37aee2;
+      box-shadow: 0 4px 0 #1e96c8;
+    }
+    
+    .pixel-btn:active {
+      box-shadow: 0 2px 0 #1e96c8;
+      transform: translateY(2px);
+    }
+    
+    /* Адаптивность */
+    @media (max-width: 768px) {
+      video {
+        width: 100%;
+      }
+      
+      #controls {
+        padding: 0.8rem;
+      }
+      
+      button {
+        padding: 0.7rem 1.2rem;
+        font-size: 0.9em;
+      }
+    }
   </style>
 </head>
 <body>
+  <!-- Декоративные космические элементы -->
+  <div class="stars" id="stars"></div>
+  <div class="cosmic-element planet"></div>
+  <div class="cosmic-element satellite"></div>
+  
+  <!-- Оригинальная структура без изменений -->
   <h1>🎸 Jammer Live</h1>
 
   <div id="controls">
@@ -42,6 +375,260 @@
   <div id="log"></div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <script src="app.js"></script>
+  <script>
+    // Генерация звездного неба
+    function createStars() {
+      const starsContainer = document.getElementById('stars');
+      for (let i = 0; i < 100; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        star.style.width = Math.random() * 3 + 'px';
+        star.style.height = star.style.width;
+        star.style.left = Math.random() * 100 + '%';
+        star.style.top = Math.random() * 100 + '%';
+        star.style.animationDelay = Math.random() * 3 + 's';
+        star.style.opacity = Math.random() * 0.7 + 0.3;
+        starsContainer.appendChild(star);
+      }
+    }
+    
+    // Добавление пиксель-арт стиля к кнопкам
+    function addPixelStyle() {
+      const buttons = document.querySelectorAll('button');
+      buttons.forEach(btn => {
+        btn.classList.add('pixel-btn');
+      });
+    }
+    
+    // Инициализация визуальных эффектов
+    document.addEventListener('DOMContentLoaded', function() {
+      createStars();
+      addPixelStyle();
+      
+      // Добавляем эффект набора текста для лога
+      const originalLog = console.log;
+      console.log = function(message) {
+        originalLog.apply(console, arguments);
+        const logElement = document.getElementById('log');
+        if (logElement) {
+          const div = document.createElement('div');
+          div.className = 'msg';
+          div.textContent = message;
+          logElement.appendChild(div);
+          logElement.scrollTop = logElement.scrollHeight;
+        }
+      };
+    });
+    
+    // Сохранение оригинальной логики (пример)
+    const SIGNALING_SERVER = location.hostname === "localhost" || location.hostname === "127.0.0.1"
+      ? "http://localhost:3000"
+      : window.location.origin;
+
+    const ICE_CONFIG = {
+      iceServers: [
+        {
+          urls: [
+            "stun:fr-turn3.xirsys.com",
+            "turn:fr-turn3.xirsys.com:80?transport=udp",
+            "turn:fr-turn3.xirsys.com:3478?transport=udp",
+            "turn:fr-turn3.xirsys.com:80?transport=tcp",
+            "turn:fr-turn3.xirsys.com:3478?transport=tcp",
+            "turns:fr-turn3.xirsys.com:443?transport=tcp",
+            "turns:fr-turn3.xirsys.com:5349?transport=tcp"
+          ],
+          username: "B0UKGM_7iTKBEwxa1dB6bNj18YKk4Vm-Fo7a3ddF4G8gshE2GgC_0tLJnF8DGtPnAAAAAGjHzn1Qcm9kb29zc2Vy",
+          credential: "24cbbacc-920e-11f0-82f1-e25abca605ee",
+        },
+      ],
+    };
+
+    // Оригинальный JavaScript код остается без изменений
+    const localVideo = document.getElementById("localVideo");
+    const remoteVideo = document.getElementById("remoteVideo");
+    const joinBtn = document.getElementById("joinBtn");
+    const leaveBtn = document.getElementById("leaveBtn");
+    const roomIdInput = document.getElementById("roomId");
+    const roleSelect = document.getElementById("roleSelect");
+    const statusSpan = document.getElementById("status");
+    const showRoom = document.getElementById("showRoom");
+    const socketIdSpan = document.getElementById("socketId");
+    const logEl = document.getElementById("log");
+    const chatEl = document.getElementById("chat");
+    const chatInput = document.getElementById("chatInput");
+    const sendChatBtn = document.getElementById("sendChatBtn");
+
+    let socket = null;
+    let pc = null;
+    let localStream = null;
+    let roomId = null;
+    let role = null;
+    let peerSocketId = null;
+
+    function log(msg) {
+      const d = document.createElement("div");
+      d.textContent = msg;
+      logEl.appendChild(d);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    
+    function addChat(user, text) {
+      const d = document.createElement("div");
+      d.className = "msg";
+      d.innerHTML = `<b>${user}:</b> ${text}`;
+      chatEl.appendChild(d);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    async function startLocalMedia() {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
+        localVideo.srcObject = localStream;
+      } catch (e) {
+        alert("Ошибка доступа к камере/микрофону: " + e.message);
+        throw e;
+      }
+    }
+
+    function createPeerConnection() {
+      pc = new RTCPeerConnection(ICE_CONFIG);
+
+      if (localStream) {
+        localStream.getTracks().forEach((track) =>
+          pc.addTrack(track, localStream)
+        );
+      }
+
+      pc.ontrack = (evt) => {
+        log("Got remote stream");
+        remoteVideo.srcObject = evt.streams[0];
+      };
+
+      pc.onicecandidate = (evt) => {
+        if (evt.candidate && peerSocketId) {
+          socket.emit("ice-candidate", { to: peerSocketId, candidate: evt.candidate });
+          log("Sent ICE candidate to " + peerSocketId);
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        statusSpan.textContent = pc.connectionState;
+        log("PC state: " + pc.connectionState);
+      };
+    }
+
+    async function makeOffer() {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit("offer", { to: peerSocketId, sdp: pc.localDescription });
+      log("Sent offer to " + peerSocketId);
+    }
+
+    function setupSocket() {
+      socket = io(SIGNALING_SERVER);
+
+      socket.on("connect", () => {
+        socketIdSpan.textContent = socket.id;
+        log("Connected to signaling server: " + socket.id);
+        socket.emit("join-room", roomId, role);
+      });
+
+      socket.on("peer-joined", ({ id, role: r }) => {
+        log("Peer joined: " + JSON.stringify({ id, role: r }));
+        if (role !== r) {
+          peerSocketId = id;
+          if (role === "teacher") {
+            makeOffer();
+          }
+        }
+      });
+
+      socket.on("offer", async ({ from, sdp }) => {
+        if (role === "student") {
+          log("Received offer from " + from);
+          peerSocketId = from;
+          if (!pc) createPeerConnection();
+          await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit("answer", { to: from, sdp: pc.localDescription });
+          log("Sent answer to " + from);
+        }
+      });
+
+      socket.on("answer", async ({ from, sdp }) => {
+        log("Received answer from " + from);
+        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      });
+
+      socket.on("ice-candidate", async ({ from, candidate }) => {
+        if (pc) {
+          try {
+            await pc.addIceCandidate(candidate);
+            log("Added ICE candidate from " + from);
+          } catch (e) {
+            console.warn("Error adding candidate", e);
+          }
+        }
+      });
+
+      socket.on("peer-left", ({ id }) => {
+        log("Peer left: " + id);
+        addChat("system", "Партнёр отключился");
+        if (pc) {
+          pc.close();
+          pc = null;
+        }
+        remoteVideo.srcObject = null;
+      });
+
+      socket.on("message", ({ user, text }) => {
+        addChat(user, text);
+      });
+    }
+
+    joinBtn.onclick = async () => {
+      roomId = roomIdInput.value.trim();
+      role = roleSelect.value;
+      if (!roomId) return alert("Укажи Room ID");
+
+      showRoom.textContent = roomId;
+      statusSpan.textContent = "connecting...";
+      joinBtn.disabled = true;
+      leaveBtn.disabled = false;
+
+      await startLocalMedia();
+      createPeerConnection();
+      setupSocket();
+    };
+
+    leaveBtn.onclick = () => {
+      if (socket) socket.disconnect();
+      if (pc) {
+        pc.close();
+        pc = null;
+      }
+      if (localStream) {
+        localStream.getTracks().forEach((t) => t.stop());
+        localStream = null;
+      }
+      remoteVideo.srcObject = null;
+      localVideo.srcObject = null;
+      joinBtn.disabled = false;
+      leaveBtn.disabled = true;
+      statusSpan.textContent = "not connected";
+      log("Left room");
+    };
+
+    sendChatBtn.onclick = () => {
+      const text = chatInput.value.trim();
+      if (!text) return;
+      if (socket) socket.emit("message", { room: roomId, user: role, text });
+      chatInput.value = "";
+    };
+  </script>
 </body>
 </html>
