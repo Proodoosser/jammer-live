@@ -2,425 +2,435 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>Jammer Live</title>
   <style>
-    /* === ОСНОВНЫЕ СТИЛИ TELEGRAM === */
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      padding: 1em; 
-      background: var(--tg-theme-bg-color, #18222d); 
-      color: var(--tg-theme-text-color, #ffffff);
+    /* === ОСНОВНЫЕ СТИЛИ === */
+    * {
       margin: 0;
-      overflow-x: hidden;
-      cursor: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iNCIgZmlsbD0iIzM3YWVlMiIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+'), auto;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
     }
     
-    /* === КОСМИЧЕСКАЯ ТЕМА И ПИКСЕЛЬ-АРТ === */
-    body::before {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: 
-        radial-gradient(circle at 20% 30%, rgba(55, 174, 226, 0.1) 0%, transparent 50%),
-        radial-gradient(circle at 80% 70%, rgba(32, 139, 212, 0.1) 0%, transparent 50%),
-        linear-gradient(45deg, #0a0a2a 0%, #1a1a3a 100%);
-      z-index: -2;
-      pointer-events: none;
-    }
-    
-    /* Пиксельная сетка */
-    body::after {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-image: 
-        linear-gradient(rgba(55, 174, 226, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(55, 174, 226, 0.05) 1px, transparent 1px);
-      background-size: 20px 20px;
-      z-index: -1;
-      pointer-events: none;
-    }
-    
-    /* Звезды */
-    .stars {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: -1;
-    }
-    
-    .star {
-      position: absolute;
-      background: white;
-      border-radius: 50%;
-      animation: twinkle 3s infinite ease-in-out;
-    }
-    
-    @keyframes twinkle {
-      0%, 100% { opacity: 0.3; }
-      50% { opacity: 1; }
-    }
-    
-    /* === ЭЛЕМЕНТЫ ИНТЕРФЕЙСА === */
-    h1 {
-      text-align: center;
-      color: var(--tg-theme-text-color, #ffffff);
-      margin-bottom: 1rem;
-      font-size: 1.8em;
-      text-shadow: 0 0 10px rgba(55, 174, 226, 0.5);
-      position: relative;
-    }
-    
-    h1::after {
-      content: '🚀';
-      position: absolute;
-      right: 20%;
-      animation: float 3s ease-in-out infinite;
-    }
-    
-    @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-5px); }
-    }
-    
-    /* Контролы */
-    #controls {
-      margin: 1em 0;
-      padding: 1rem;
-      background: var(--tg-theme-secondary-bg-color, #1f2d3b);
-      border-radius: 12px;
-      border: 1px solid var(--tg-theme-hint-color, #2f3e4e);
-      position: relative;
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #18222d;
+      color: #ffffff;
+      width: 360px;
+      height: 640px;
       overflow: hidden;
-    }
-    
-    #controls::before {
-      content: '';
-      position: absolute;
-      top: 0;
+      position: fixed;
+      margin: 0 auto;
       left: 0;
-      width: 100%;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, #37aee2, transparent);
-      animation: scanLine 2s linear infinite;
+      right: 0;
+      border: 1px solid #2f3e4e;
     }
     
-    @keyframes scanLine {
-      0% { transform: translateX(-100%); }
-      100% { transform: translateX(100%); }
+    .container {
+      width: 100%;
+      height: 100%;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    }
+    
+    /* === ЗАГОЛОВОК === */
+    .header {
+      text-align: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(55, 174, 226, 0.3);
+    }
+    
+    h1 {
+      font-size: 20px;
+      color: #ffffff;
+      text-shadow: 0 0 10px rgba(55, 174, 226, 0.5);
+    }
+    
+    /* === ПАНЕЛЬ УПРАВЛЕНИЯ === */
+    #controls {
+      background: rgba(30, 41, 59, 0.9);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(55, 174, 226, 0.3);
+    }
+    
+    .input-group {
+      margin-bottom: 12px;
     }
     
     label {
       display: block;
-      margin: 0.5rem 0;
-      color: var(--tg-theme-hint-color, #8e9aa3);
-      font-size: 0.9em;
+      font-size: 12px;
+      color: #8e9aa3;
+      margin-bottom: 4px;
     }
     
     input, select {
       width: 100%;
-      padding: 0.8rem;
-      margin: 0.3rem 0;
-      background: var(--tg-theme-bg-color, #18222d);
-      border: 1px solid var(--tg-theme-hint-color, #2f3e4e);
+      padding: 10px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(55, 174, 226, 0.4);
       border-radius: 8px;
-      color: var(--tg-theme-text-color, #ffffff);
-      font-family: inherit;
+      color: #ffffff;
+      font-size: 14px;
     }
     
-    /* Кнопки в стиле пиксель-арт */
+    .teacher-auth {
+      display: none;
+      background: rgba(255, 193, 7, 0.1);
+      border: 1px solid rgba(255, 193, 7, 0.3);
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 8px;
+    }
+    
+    /* === КНОПКИ === */
+    .button-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    
     button {
-      background: var(--tg-theme-button-color, #37aee2);
-      color: var(--tg-theme-button-text-color, #ffffff);
+      flex: 1;
+      padding: 12px;
       border: none;
-      padding: 0.8rem 1.5rem;
-      margin: 0.3rem;
       border-radius: 8px;
+      font-weight: 600;
       cursor: pointer;
-      font-family: inherit;
-      font-weight: 500;
-      position: relative;
-      overflow: hidden;
-      transition: all 0.3s ease;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      transition: all 0.2s;
     }
     
-    button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+    #joinBtn {
+      background: linear-gradient(135deg, #37aee2, #1e96c8);
+      color: white;
     }
     
-    button:active {
-      transform: translateY(0px);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-    }
-    
-    button::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-      transition: left 0.5s;
-    }
-    
-    button:hover::before {
-      left: 100%;
+    #leaveBtn {
+      background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+      color: white;
     }
     
     button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
-      transform: none !important;
     }
     
-    /* Видео контейнеры */
-    div:has(video) {
+    /* === ВИДЕО КОНТЕЙНЕР === */
+    .video-section {
+      flex: 1;
       display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      margin: 1rem 0;
-      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 16px;
+      min-height: 200px;
+    }
+    
+    .video-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      height: 150px;
+    }
+    
+    .video-wrapper {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      border: 2px solid rgba(55, 174, 226, 0.3);
+      transition: all 0.3s ease;
+    }
+    
+    .video-wrapper.active {
+      border-color: #37aee2;
+      box-shadow: 0 0 15px rgba(55, 174, 226, 0.3);
+    }
+    
+    .video-wrapper.fullscreen {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90%;
+      height: 60%;
+      z-index: 1000;
+      border: 3px solid #37aee2;
     }
     
     video {
-      width: 45%;
-      background: #000;
-      border: 2px solid var(--tg-theme-hint-color, #2f3e4e);
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      transition: all 0.3s ease;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
     
-    video:hover {
-      border-color: #37aee2;
-      box-shadow: 0 6px 16px rgba(55, 174, 226, 0.3);
-    }
-    
-    /* Статус бар */
-    div:has(#status) {
-      background: var(--tg-theme-secondary-bg-color, #1f2d3b);
-      padding: 0.8rem;
-      border-radius: 8px;
-      margin: 1rem 0;
-      font-size: 0.9em;
-      border: 1px solid var(--tg-theme-hint-color, #2f3e4e);
-    }
-    
-    /* === ВЫДВИЖНОЙ ЧАТ === */
-    #chat {
-      border: 1px solid var(--tg-theme-hint-color, #2f3e4e);
-      height: 150px;
-      overflow-y: auto;
-      padding: 5px;
-      margin-top: 1em;
-      background: var(--tg-theme-secondary-bg-color, #1f2d3b);
-      border-radius: 12px;
-      transition: all 0.3s ease;
-      position: relative;
-    }
-    
-    #chat:hover {
-      height: 250px;
-    }
-    
-    #chat::after {
-      content: '⬆️ Наведите для увеличения';
+    .video-overlay {
       position: absolute;
-      bottom: 5px;
-      right: 5px;
-      font-size: 0.7em;
-      color: var(--tg-theme-hint-color, #8e9aa3);
-      opacity: 0;
-      transition: opacity 0.3s ease;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+      padding: 8px;
+      color: white;
+      font-size: 11px;
     }
     
-    #chat:hover::after {
-      opacity: 1;
+    .video-controls {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: flex;
+      gap: 4px;
+    }
+    
+    .control-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.5);
+      border: none;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    
+    /* === ВОЛНЫ ГОЛОСА === */
+    .voice-waves {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 16px;
+      margin-top: 4px;
+    }
+    
+    .wave {
+      width: 3px;
+      background: #37aee2;
+      border-radius: 2px;
+      transition: height 0.2s ease;
+    }
+    
+    /* === СТАТУС БАР === */
+    .status-bar {
+      background: rgba(30, 41, 59, 0.9);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid rgba(55, 174, 226, 0.3);
+      font-size: 12px;
+    }
+    
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    
+    .status-value {
+      color: #37aee2;
+      font-weight: 500;
+    }
+    
+    /* === ЧАТ === */
+    .chat-section {
+      position: relative;
+      margin-bottom: 12px;
+    }
+    
+    .chat-handle {
+      position: absolute;
+      top: -25px;
+      right: 10px;
+      width: 40px;
+      height: 25px;
+      background: rgba(55, 174, 226, 0.8);
+      border-radius: 12px 12px 0 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 10;
+    }
+    
+    #chat {
+      height: 120px;
+      border: 1px solid rgba(55, 174, 226, 0.3);
+      border-radius: 12px;
+      padding: 10px;
+      overflow-y: auto;
+      background: rgba(15, 23, 42, 0.8);
+      margin-bottom: 8px;
     }
     
     .msg {
-      margin: 2px 0;
-      padding: 0.5rem;
-      border-radius: 8px;
-      background: var(--tg-theme-bg-color, #18222d);
-      font-size: 0.9em;
+      margin-bottom: 6px;
+      padding: 6px;
+      border-radius: 6px;
+      background: rgba(55, 174, 226, 0.1);
+      font-size: 11px;
     }
     
-    /* Ввод сообщения */
+    .chat-input-group {
+      display: flex;
+      gap: 8px;
+    }
+    
     #chatInput {
-      margin-top: 0.5rem;
-      background: var(--tg-theme-bg-color, #18222d);
-      border: 1px solid var(--tg-theme-hint-color, #2f3e4e);
-      color: var(--tg-theme-text-color, #ffffff);
+      flex: 1;
+      margin: 0;
+      padding: 8px;
+      font-size: 12px;
     }
     
-    /* Лог */
+    #sendChatBtn {
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+    
+    /* === ЛОГ === */
     #log {
-      font-size: 0.8em;
-      background: var(--tg-theme-secondary-bg-color, #1f2d3b);
-      padding: 5px;
-      margin-top: 1em;
-      height: 100px;
-      overflow-y: auto;
+      height: 80px;
+      border: 1px solid rgba(55, 174, 226, 0.3);
       border-radius: 8px;
-      border: 1px solid var(--tg-theme-hint-color, #2f3e4e);
+      padding: 8px;
+      overflow-y: auto;
+      background: rgba(15, 23, 42, 0.8);
+      font-size: 10px;
+      margin-bottom: 8px;
     }
     
-    /* === ДЕКОРАТИВНЫЕ ЭЛЕМЕНТЫ === */
-    .cosmic-element {
-      position: fixed;
-      pointer-events: none;
-      z-index: -1;
+    .log-entry {
+      margin-bottom: 4px;
+      padding: 4px;
+      border-radius: 4px;
+      background: rgba(55, 174, 226, 0.1);
     }
     
-    .planet {
-      width: 100px;
-      height: 100px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 30% 30%, #37aee2, #1e96c8);
-      box-shadow: 0 0 30px rgba(55, 174, 226, 0.3);
-      top: 10%;
-      right: 5%;
-      opacity: 0.1;
+    /* === АНИМАЦИИ === */
+    @keyframes wave {
+      0%, 100% { height: 4px; }
+      50% { height: 16px; }
     }
     
-    .satellite {
-      width: 30px;
-      height: 30px;
-      background: #37aee2;
-      border-radius: 50%;
-      animation: orbit 20s linear infinite;
-      box-shadow: 0 0 10px rgba(55, 174, 226, 0.5);
+    .wave.active {
+      animation: wave 1.5s infinite;
     }
     
-    @keyframes orbit {
-      0% { transform: rotate(0deg) translateX(100px) rotate(0deg); }
-      100% { transform: rotate(360deg) translateX(100px) rotate(-360deg); }
-    }
-    
-    /* Анимированные кнопки */
-    .pixel-btn {
-      image-rendering: pixelated;
-      border: 2px solid #37aee2;
-      box-shadow: 0 4px 0 #1e96c8;
-    }
-    
-    .pixel-btn:active {
-      box-shadow: 0 2px 0 #1e96c8;
-      transform: translateY(2px);
-    }
-    
-    /* Адаптивность */
-    @media (max-width: 768px) {
-      video {
-        width: 100%;
-      }
-      
-      #controls {
-        padding: 0.8rem;
-      }
-      
-      button {
-        padding: 0.7rem 1.2rem;
-        font-size: 0.9em;
-      }
-    }
+    .wave:nth-child(2) { animation-delay: 0.2s; }
+    .wave:nth-child(3) { animation-delay: 0.4s; }
+    .wave:nth-child(4) { animation-delay: 0.6s; }
+    .wave:nth-child(5) { animation-delay: 0.8s; }
   </style>
 </head>
 <body>
-  <!-- Декоративные космические элементы -->
-  <div class="stars" id="stars"></div>
-  <div class="cosmic-element planet"></div>
-  <div class="cosmic-element satellite"></div>
-  
-  <!-- Оригинальная структура без изменений -->
-  <h1>🎸 Jammer Live</h1>
-
-  <div id="controls">
-    <label>Room: <input id="roomId" value="lesson123"></label>
-    <label>Role:
-      <select id="roleSelect">
-        <option value="teacher">Teacher</option>
-        <option value="student">Student</option>
-      </select>
-    </label>
-    <button id="joinBtn">Join</button>
-    <button id="leaveBtn" disabled>Leave</button>
+  <div class="container">
+    <div class="header">
+      <h1>🎸 Jammer Live</h1>
+    </div>
+    
+    <div id="controls">
+      <div class="input-group">
+        <label>Room ID</label>
+        <input type="text" id="roomId" value="lesson123">
+      </div>
+      
+      <div class="input-group">
+        <label>Role</label>
+        <select id="roleSelect">
+          <option value="student">Student</option>
+          <option value="teacher">Teacher</option>
+        </select>
+      </div>
+      
+      <div class="teacher-auth" id="teacherAuth">
+        <label>Teacher Password</label>
+        <input type="password" id="teacherPassword" placeholder="Enter password">
+      </div>
+      
+      <div class="button-group">
+        <button id="joinBtn">Join</button>
+        <button id="leaveBtn" disabled>Leave</button>
+      </div>
+    </div>
+    
+    <div class="video-section">
+      <div class="video-grid">
+        <div class="video-wrapper" id="localVideoWrapper">
+          <video id="localVideo" autoplay playsinline muted></video>
+          <div class="video-overlay">
+            <div>You</div>
+            <div class="voice-waves">
+              <div class="wave" id="localWave1"></div>
+              <div class="wave" id="localWave2"></div>
+              <div class="wave" id="localWave3"></div>
+              <div class="wave" id="localWave4"></div>
+              <div class="wave" id="localWave5"></div>
+            </div>
+          </div>
+          <div class="video-controls">
+            <button class="control-btn" onclick="toggleFullscreen('localVideoWrapper')">⛶</button>
+          </div>
+        </div>
+        
+        <div class="video-wrapper" id="remoteVideoWrapper">
+          <video id="remoteVideo" autoplay playsinline></video>
+          <div class="video-overlay">
+            <div>Remote</div>
+            <div class="voice-waves">
+              <div class="wave" id="remoteWave1"></div>
+              <div class="wave" id="remoteWave2"></div>
+              <div class="wave" id="remoteWave3"></div>
+              <div class="wave" id="remoteWave4"></div>
+              <div class="wave" id="remoteWave5"></div>
+            </div>
+          </div>
+          <div class="video-controls">
+            <button class="control-btn" onclick="toggleFullscreen('remoteVideoWrapper')">⛶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="status-bar">
+      <div class="status-item">
+        <span>Status:</span>
+        <span class="status-value" id="status">not connected</span>
+      </div>
+      <div class="status-item">
+        <span>Room:</span>
+        <span class="status-value" id="showRoom">-</span>
+      </div>
+      <div class="status-item">
+        <span>SocketID:</span>
+        <span class="status-value" id="socketId">-</span>
+      </div>
+    </div>
+    
+    <div class="chat-section">
+      <div class="chat-handle" onclick="toggleChat()">💬</div>
+      <div id="chat"></div>
+      <div class="chat-input-group">
+        <input type="text" id="chatInput" placeholder="Message..." disabled>
+        <button id="sendChatBtn" disabled>Send</button>
+      </div>
+    </div>
+    
+    <div id="log"></div>
   </div>
-
-  <div>
-    <video id="localVideo" autoplay playsinline muted></video>
-    <video id="remoteVideo" autoplay playsinline></video>
-  </div>
-
-  <div>Status: <span id="status">not connected</span> | Room: <span id="showRoom">-</span> | SocketID: <span id="socketId">-</span></div>
-
-  <div id="chat"></div>
-  <input id="chatInput" placeholder="Message..."/>
-  <button id="sendChatBtn">Send</button>
-
-  <div id="log"></div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>
-    // Генерация звездного неба
-    function createStars() {
-      const starsContainer = document.getElementById('stars');
-      for (let i = 0; i < 100; i++) {
-        const star = document.createElement('div');
-        star.className = 'star';
-        star.style.width = Math.random() * 3 + 'px';
-        star.style.height = star.style.width;
-        star.style.left = Math.random() * 100 + '%';
-        star.style.top = Math.random() * 100 + '%';
-        star.style.animationDelay = Math.random() * 3 + 's';
-        star.style.opacity = Math.random() * 0.7 + 0.3;
-        starsContainer.appendChild(star);
-      }
-    }
-    
-    // Добавление пиксель-арт стиля к кнопкам
-    function addPixelStyle() {
-      const buttons = document.querySelectorAll('button');
-      buttons.forEach(btn => {
-        btn.classList.add('pixel-btn');
-      });
-    }
-    
-    // Инициализация визуальных эффектов
-    document.addEventListener('DOMContentLoaded', function() {
-      createStars();
-      addPixelStyle();
-      
-      // Добавляем эффект набора текста для лога
-      const originalLog = console.log;
-      console.log = function(message) {
-        originalLog.apply(console, arguments);
-        const logElement = document.getElementById('log');
-        if (logElement) {
-          const div = document.createElement('div');
-          div.className = 'msg';
-          div.textContent = message;
-          logElement.appendChild(div);
-          logElement.scrollTop = logElement.scrollHeight;
-        }
-      };
-    });
-    
-    // Сохранение оригинальной логики (пример)
+    // Конфигурация
     const SIGNALING_SERVER = location.hostname === "localhost" || location.hostname === "127.0.0.1"
       ? "http://localhost:3000"
       : window.location.origin;
@@ -443,13 +453,15 @@
       ],
     };
 
-    // Оригинальный JavaScript код остается без изменений
+    // Элементы
     const localVideo = document.getElementById("localVideo");
     const remoteVideo = document.getElementById("remoteVideo");
     const joinBtn = document.getElementById("joinBtn");
     const leaveBtn = document.getElementById("leaveBtn");
     const roomIdInput = document.getElementById("roomId");
     const roleSelect = document.getElementById("roleSelect");
+    const teacherAuth = document.getElementById("teacherAuth");
+    const teacherPassword = document.getElementById("teacherPassword");
     const statusSpan = document.getElementById("status");
     const showRoom = document.getElementById("showRoom");
     const socketIdSpan = document.getElementById("socketId");
@@ -464,9 +476,39 @@
     let roomId = null;
     let role = null;
     let peerSocketId = null;
+    let isChatExpanded = false;
 
+    // Функции управления интерфейсом
+    function toggleChat() {
+      const chat = document.getElementById('chat');
+      isChatExpanded = !isChatExpanded;
+      chat.style.height = isChatExpanded ? '200px' : '120px';
+    }
+
+    function toggleFullscreen(videoId) {
+      const videoWrapper = document.getElementById(videoId);
+      videoWrapper.classList.toggle('fullscreen');
+    }
+
+    function toggleTeacherAuth() {
+      teacherAuth.style.display = roleSelect.value === 'teacher' ? 'block' : 'none';
+    }
+
+    function updateVoiceWaves() {
+      const waves = document.querySelectorAll('.wave');
+      waves.forEach(wave => {
+        if (Math.random() > 0.3) {
+          wave.classList.add('active');
+        } else {
+          wave.classList.remove('active');
+        }
+      });
+    }
+
+    // Утилиты
     function log(msg) {
       const d = document.createElement("div");
+      d.className = "log-entry";
       d.textContent = msg;
       logEl.appendChild(d);
       logEl.scrollTop = logEl.scrollHeight;
@@ -480,6 +522,7 @@
       chatEl.scrollTop = chatEl.scrollHeight;
     }
 
+    // WebRTC функции
     async function startLocalMedia() {
       try {
         localStream = await navigator.mediaDevices.getUserMedia({
@@ -487,8 +530,9 @@
           audio: true,
         });
         localVideo.srcObject = localStream;
+        log("Media devices activated");
       } catch (e) {
-        alert("Ошибка доступа к камере/микрофону: " + e.message);
+        alert("Error accessing media devices: " + e.message);
         throw e;
       }
     }
@@ -503,20 +547,21 @@
       }
 
       pc.ontrack = (evt) => {
-        log("Got remote stream");
+        log("Remote stream received");
         remoteVideo.srcObject = evt.streams[0];
+        statusSpan.textContent = "connected";
       };
 
       pc.onicecandidate = (evt) => {
         if (evt.candidate && peerSocketId) {
           socket.emit("ice-candidate", { to: peerSocketId, candidate: evt.candidate });
-          log("Sent ICE candidate to " + peerSocketId);
+          log("ICE candidate sent");
         }
       };
 
       pc.onconnectionstatechange = () => {
         statusSpan.textContent = pc.connectionState;
-        log("PC state: " + pc.connectionState);
+        log("Connection state: " + pc.connectionState);
       };
     }
 
@@ -524,20 +569,21 @@
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       socket.emit("offer", { to: peerSocketId, sdp: pc.localDescription });
-      log("Sent offer to " + peerSocketId);
+      log("Offer sent");
     }
 
+    // Socket функции
     function setupSocket() {
       socket = io(SIGNALING_SERVER);
 
       socket.on("connect", () => {
         socketIdSpan.textContent = socket.id;
-        log("Connected to signaling server: " + socket.id);
+        log("Connected to signaling server");
         socket.emit("join-room", roomId, role);
       });
 
       socket.on("peer-joined", ({ id, role: r }) => {
-        log("Peer joined: " + JSON.stringify({ id, role: r }));
+        log("Peer joined: " + id);
         if (role !== r) {
           peerSocketId = id;
           if (role === "teacher") {
@@ -548,19 +594,19 @@
 
       socket.on("offer", async ({ from, sdp }) => {
         if (role === "student") {
-          log("Received offer from " + from);
+          log("Offer received from " + from);
           peerSocketId = from;
           if (!pc) createPeerConnection();
           await pc.setRemoteDescription(new RTCSessionDescription(sdp));
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           socket.emit("answer", { to: from, sdp: pc.localDescription });
-          log("Sent answer to " + from);
+          log("Answer sent");
         }
       });
 
       socket.on("answer", async ({ from, sdp }) => {
-        log("Received answer from " + from);
+        log("Answer received from " + from);
         await pc.setRemoteDescription(new RTCSessionDescription(sdp));
       });
 
@@ -568,7 +614,7 @@
         if (pc) {
           try {
             await pc.addIceCandidate(candidate);
-            log("Added ICE candidate from " + from);
+            log("ICE candidate added from " + from);
           } catch (e) {
             console.warn("Error adding candidate", e);
           }
@@ -577,7 +623,7 @@
 
       socket.on("peer-left", ({ id }) => {
         log("Peer left: " + id);
-        addChat("system", "Партнёр отключился");
+        addChat("system", "Peer disconnected");
         if (pc) {
           pc.close();
           pc = null;
@@ -590,15 +636,25 @@
       });
     }
 
+    // Обработчики событий
     joinBtn.onclick = async () => {
       roomId = roomIdInput.value.trim();
       role = roleSelect.value;
-      if (!roomId) return alert("Укажи Room ID");
+      
+      // Проверка пароля для учителя
+      if (role === "teacher" && teacherPassword.value !== "teacher123") {
+        alert("Invalid teacher password");
+        return;
+      }
+
+      if (!roomId) return alert("Enter Room ID");
 
       showRoom.textContent = roomId;
       statusSpan.textContent = "connecting...";
       joinBtn.disabled = true;
       leaveBtn.disabled = false;
+      chatInput.disabled = false;
+      sendChatBtn.disabled = false;
 
       await startLocalMedia();
       createPeerConnection();
@@ -619,6 +675,8 @@
       localVideo.srcObject = null;
       joinBtn.disabled = false;
       leaveBtn.disabled = true;
+      chatInput.disabled = true;
+      sendChatBtn.disabled = true;
       statusSpan.textContent = "not connected";
       log("Left room");
     };
@@ -629,6 +687,14 @@
       if (socket) socket.emit("message", { room: roomId, user: role, text });
       chatInput.value = "";
     };
+
+    roleSelect.addEventListener('change', toggleTeacherAuth);
+    
+    // Анимация волн
+    setInterval(updateVoiceWaves, 300);
+    
+    // Инициализация
+    toggleTeacherAuth();
   </script>
 </body>
 </html>
